@@ -1,0 +1,73 @@
+import boto3
+
+# Define the AWS KMS key ID to be used for encryption
+kms_key_id = 'your-kms-key-id'
+
+# Define the S3 bucket name and file name
+bucket_name = 'your-bucket-name'
+file_name = 'your-file-name'
+
+# Create an instance of the AWS KMS client
+kms_client = boto3.client('kms')
+
+# Generate a data key from the KMS key
+response = kms_client.generate_data_key(
+    KeyId=kms_key_id,
+    KeySpec='AES_256'
+)
+
+# Retrieve the plaintext and encrypted data key
+plaintext_data_key = response['Plaintext']
+encrypted_data_key = response['CiphertextBlob']
+
+# Create an instance of the AWS S3 client
+s3_client = boto3.client('s3')
+
+# Encrypt and upload the file to S3
+with open(file_name, 'rb') as file:
+    encrypted_file = kms_client.encrypt(
+        KeyId=kms_key_id,
+        Plaintext=file.read()
+    )['CiphertextBlob']
+    
+    s3_client.put_object(
+        Bucket=bucket_name,
+        Key=file_name,
+        Body=encrypted_file
+    )
+
+# Print the location of the encrypted file in S3
+print(f'Encrypted file uploaded to: s3://{bucket_name}/{file_name}')
+
+
+import boto3
+
+# Define the AWS KMS key ID used for encryption
+kms_key_id = 'your-kms-key-id'
+
+# Define the S3 bucket name and file name
+bucket_name = 'your-bucket-name'
+file_name = 'your-file-name'
+
+# Create an instance of the AWS KMS client
+kms_client = boto3.client('kms')
+
+# Create an instance of the AWS S3 client
+s3_client = boto3.client('s3')
+
+# Retrieve the encrypted file from S3
+response = s3_client.get_object(Bucket=bucket_name, Key=file_name)
+encrypted_file = response['Body'].read()
+
+# Decrypt the file content using the KMS key
+decrypted_file = kms_client.decrypt(
+    CiphertextBlob=encrypted_file,
+    KeyId=kms_key_id
+)['Plaintext']
+
+# Save the decrypted content to a file
+with open('decrypted_file.txt', 'wb') as file:
+    file.write(decrypted_file)
+
+# Print the location of the decrypted file
+print('Decrypted file saved as: decrypted_file.txt')
