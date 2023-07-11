@@ -1,0 +1,171 @@
+Step 1: Set up AWS Infrastructure
+1.	Create a VPC in each region with private and public subnets.
+2.	Configure security groups and network ACLs to control inbound and outbound traffic.
+Step 2: Deploy Java UI in public subnet
+1.	Set up EC2 instances in the public subnets of each region's VPC to host the Java UI.
+2.	Configure an Application Load Balancer (ALB) in each region to distribute traffic to the Java UI instances.
+
+
+IAM Roles:
+1.	Create an IAM role for the Java UI EC2 instances.
+2.	Attach the necessary IAM policies to the role to grant permissions for the required AWS services. In this case, the role would need permissions to interact with the necessary AWS services such as EC2, VPC, and EKS (if applicable).
+Security Groups:
+1.	Create a security group for the Java UI EC2 instances.
+2.	Allow inbound traffic on the required ports from the private subnet where the Kubernetes services are located. This would typically include the ports used by the API services (e.g., 80 for HTTP, 443 for HTTPS).
+3.	If you have specific IP ranges that should have access to the Java UI, you can restrict inbound traffic to those IP ranges.
+4.	Configure outbound traffic rules to allow the Java UI EC2 instances to communicate with the necessary destinations, such as the Kubernetes services in the private subnet or any other external services required by your application.
+
+Step 3: Migrate Kubernetes to EKS
+1.	Create an Amazon EKS cluster in each region using the AWS Management Console, AWS CLI, or Infrastructure as Code (IaC) tools.
+IAM Role attached to the cluster: 
+
+EKS_Cluster_Role  ->  AmazonEKSClusterPolicy
+
+Once cluster created please run the below command.  This will install the kubectl command in CLI.
+
+curl.exe -O https://s3.us-west-2.amazonaws.com/amazon-eks/1.27.1/2023-04-19/bin/windows/amd64/kubectl.exe
+
+Then run the command kubectl to make sure kubectl it is installed.
+
+aws eks --region us-east-1 describe-cluster --name yurekakubernetescluster --query cluster.status
+
+The above command will provide the status of EKS CLUSTER
+
+
+C:\Users\shasv>aws eks --region us-east-1 update-kubeconfig --name yurekakubernetescluster
+
+Added new context arn:aws:eks:us-east-1:621650723163:cluster/yurekakubernetescluster to C:\Users\shasv\.kube\config
+
+kubectl get svc
+
+C:\Users\shasv>kubectl get svc
+NAME         TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
+kubernetes   ClusterIP   10.100.0.1   <none>        443/TCP   23m
+
+
+On Cluster creation - 2 PODS
+
+coredns-79df7fff65-782xp	
+coredns-79df7fff65-7wsqr	
+
+
+2.	Set up EC2 instances as worker nodes for the EKS clusters within the private subnets of each region's VPC.
+EC2Instancenode role:
+
+AmazonEC2ContainerRegistryReadOnly	AWS managed	
+Provides read-only access to Amazon EC2 Container Registry repositories.
+AmazonEKS_CNI_Policy	AWS managed	
+This policy provides the Amazon VPC CNI Plugin (amazon-vpc-cni-k8s) the permissions it requires to modify the IP address configuration on your EKS worker nodes. This permission set allows the CNI to list, describe, and modify Elastic Network Interfaces on your behalf. More information on the AWS VPC CNI Plugin is available here: https://github.com/aws/amazon-vpc-cni-k8s
+AmazonEKSWorkerNodePolicy	AWS managed	
+This policy allows Amazon EKS worker nodes to connect to Amazon EKS Clusters.
+
+
+
+$ aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 621650723163.dkr.ecr.us-east-1.amazonaws.com
+
+$ kubectl create secret docker-registry ecr-registry --docker-server=621650723163.dkr.ecr.us-east-1.amazonaws.com --docker-username=AWS --docker-password=$(aws ecr get-login-password --region us-east-1)
+
+$ aws eks update-nodegroup-config --cluster-name yurekakubernetescluster --nodegroup-name ec2nodegroup --region us-east-1 --kubernetes-api-access "--override-system-default-credentials=true" --labels 
+
+3.	Configure EKS cluster access and authentication, including IAM roles and policies.
+4.	Build and push Docker images for the three services (configure, execute, result) to a container registry like Docker Hub or Amazon Elastic Container Registry (ECR).
+5.	Deploy the Kubernetes services using Deployment manifests or Helm charts within the EKS clusters, pulling the Docker images from the container registry.											
+
+2 EC2 Nodes - Since we specified minimum size is: 2
+
+aws-node-2nvmh 
+aws-node-7tvw9 
+kube-proxy-pkclp	
+kube-proxy-xftxm	
+
+When deploy with namespaces then it create 2 Replicas based on deployment.yaml. Here only specify the ECR
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: game-2048
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: game-2048
+  name: deployment-2048
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: app-2048
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: app-2048
+    spec:
+      containers:
+      - image: 621650723163.dkr.ecr.us-east-1.amazonaws.com/python-main-app:latest
+        imagePullPolicy: Always
+        name: app-2048
+        ports:
+        - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: game-2048
+  name: service-2048
+spec:
+  ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: app-2048
+
+This will be present in Resource section
+
+deployment-2048-7fb5b79867-796rm	
+deployment-2048-7fb5b79867-flmx2	
+
+
+
+When migrating Kubernetes to Amazon EKS, you may consider the following points regarding Elastic Network Interfaces (ENIs), IAM roles, and the integration with ECR and PostgreSQL:
+ENIs in EKS:
+•	ENIs are automatically created for EKS worker nodes in the private subnets to establish network connectivity. You don't need to manually configure or manage the ENIs for typical EKS deployments.
+IAM Roles for EKS Cluster:
+•	Create an IAM role for your EKS cluster. This role should have permissions to access and manage necessary AWS resources such as EC2, ECR, and RDS (for PostgreSQL).
+IAM Roles for EC2 Worker Nodes:
+•	Create an IAM role for the EC2 worker nodes in your EKS cluster. This role should have permissions to interact with the EKS control plane, retrieve container images from ECR, and access the necessary resources such as the PostgreSQL database.
+Integration with ECR:
+•	Authenticate the worker nodes with ECR by attaching the appropriate IAM role to them. This allows the worker nodes to pull container images from ECR during deployment.
+kubectl run my-pod --image=621650723163.dkr.ecr.us-east-1.amazonaws.com/python-main-app:latest --namespace=game-2048
+kubectl get pods --namespace=game-2048
+NAME                               READY   STATUS             RESTARTS         AGE
+deployment-2048-7fb5b79867-796rm   0/1     CrashLoopBackOff   10 (2m34s ago)   29m
+deployment-2048-7fb5b79867-flmx2   0/1     CrashLoopBackOff   10 (2m14s ago)   29m
+my-pod                             0/1     Pending            0                4m48s pod/my-pod created
+
+
+
+Integration with PostgreSQL:
+•	Ensure that the IAM roles for the worker nodes and the security groups allow the necessary inbound and outbound traffic for communication with the PostgreSQL database. This includes configuring the security group rules to permit access to the PostgreSQL database port (default: 5432).
+
+
+
+
+Step 4: Configure Load Balancing and Ingress
+1.	Deploy the AWS ALB Ingress Controller using the provided Helm chart.
+2.	Create an Ingress resource to define the routing rules for the three services within their respective namespaces.
+3.	Deploy the necessary Kubernetes services using Deployment manifests within their respective namespaces.																							
+
+Step 5: Migrate PostgreSQL to Aurora PostgreSQL
+1.	Set up an Amazon Aurora PostgreSQL database in the desired region, ensuring it is multi-AZ for high availability.
+2.	Migrate your existing PostgreSQL database to Aurora PostgreSQL using the AWS Database Migration Service (DMS) or other appropriate methods.
+3.	Update your Kubernetes service configurations to use the Aurora PostgreSQL database connection details.
+Step 6: Configure DNS Routing with Route 53
+1.	Set up a public hosted zone in Amazon Route 53 for your domain.
+2.	Create an ALB record or CNAME record in Route 53, pointing to the ALB in each region for the Java UI.
+3.	Configure routing policies like failover or weighted routing to direct traffic to the appropriate ALB based on health checks or distribution requirements.
+Please note that the Java UI is hosted on EC2 instances, while the three services (configure, execute, result) are deployed as Kubernetes services using Docker images. The sample YAML files provided in the previous responses for Kubernetes services, ALB Ingress Controller, and Ingress resources can still be used with the revised solution.
+By following these steps, you can migrate your application to AWS with 24/7 availability, leveraging Amazon EKS for Kubernetes orchestration, EC2 instances for the Java UI, Aurora PostgreSQL for the database, ALB and Ingress for load balancing and routing, and Route 53 for DNS routing.
+
