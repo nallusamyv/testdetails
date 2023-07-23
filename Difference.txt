@@ -1,0 +1,55 @@
+Amazon EKS Cost Estimate with On-Demand and Spot Instances and Data Transfer:
+
+EC2 Instances for EKS Nodes:
+
+Assuming t3.medium instance type for On-Demand EKS node (2 vCPUs, 4 GiB memory).
+Cost per t3.medium instance (On-Demand): $0.0416 per hour (approximately).
+EC2 Instances for Spot EKS Nodes:
+
+Assuming t3.medium instance type for Spot EKS node (2 vCPUs, 4 GiB memory).
+Cost per t3.medium instance (Spot): $0.0208 per hour (approximately) at 50% discount from On-Demand.
+EKS Control Plane:
+
+EKS control plane cost: $0.10 per hour (approximately).
+Total Data Transfer Cost for VPC Messages (EKS):
+
+Data Transfer Cost per day ≈ 750 MB/day x $0.01/GB = $7.50 (approximately).
+Total EKS Cost (per day for 1 EKS cluster):
+
+EKS Nodes:
+1 On-Demand node x $0.0416/hour x 24 hours = $1.0016 (approximately).
+2 Spot nodes x $0.0208/hour x 24 hours = $1.0016 (approximately).
+EKS Control Plane: $0.10 x 24 hours = $2.40 (approximately).
+Data Transfer Cost: $7.50 (approximately).
+Total EKS Cost per day ≈ $11.9132.
+Amazon ECS (Fargate Spot) Cost Estimate with Data Transfer:
+
+Fargate Tasks for REST API Services (Spot Instances):
+
+Assuming each Fargate task uses 0.5 vCPU and 512 MiB memory (minimum value).
+Cost per Fargate vCPU per hour for Fargate Spot: $0.01272 (approximately).
+Fargate Task for PostgreSQL (Spot Instances):
+
+Assuming PostgreSQL Fargate task uses 1 vCPU and 1 GiB memory (minimum value).
+Cost per Fargate vCPU per hour for Fargate Spot: $0.01272 (approximately).
+Total Data Transfer Cost for Amazon RDS (PostgreSQL serverless) (ECS):
+
+Data Transfer Cost per day ≈ 750 MB/day x $0.09/GB = $0.0675 (approximately).
+Total ECS Fargate Spot Cost (per day for 1 ECS cluster):
+
+Fargate Tasks for REST API Services: 3 tasks x 0.01272/hour x 24 hours = $0.91584 (approximately).
+Fargate Task for PostgreSQL: 1 task x 0.01272/hour x 24 hours = $0.30432 (approximately).
+Data Transfer Cost: $0.0675 (approximately).
+Total ECS Fargate Spot Cost per day ≈ $1.28716.
+
+
+Based on the provided setup and assuming 250 invocations per day for each REST API service with a maximum message size of 1 MB:
+
+The total cost of running the application on Amazon EKS with a mix of On-Demand and Spot instances (including data transfer costs for VPC messages) is approximately $11.9132 per day.
+
+The total cost of running the application on Amazon ECS with Fargate Spot instances (including data transfer costs for Amazon RDS) is approximately $1.28716 per day.
+
+
+
+
+
