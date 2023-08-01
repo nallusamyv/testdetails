@@ -1,0 +1,28 @@
+We raised the request based on understanding of, the AWS account 11251 functions as the producer account, and account 2342 was mentioned as the central lake formation account, although this account number is incorrect.
+
+The roles I granted access to in the producer account (account 11251) do not possess admin privileges to assign grants to consumer accounts.
+
+Based on the current setup, the central lake formation AWS Account has the account ID 5880, and the producer account has the account ID 11251.
+
+Lake Formation tags (LF tags) and Table access details are derived from the central lake formation account (account 5880) and applied to the producer account (account 11251).
+
+I have scheduled a meeting with Ram to gain a better understanding of how Lake Formation is currently implemented and to validate the current account details.
+
+
+Based on the discussion, the implementation for the producer account maintaining the consumers and setting up Lake Formation, including resource links and Athena access, can be represented as follows:
+
+Setup of Lake Formation in an AWS Account:
+
+In the producer account, set up Lake Formation to manage data access and permissions.
+Assign Respective LF Tags to the Consumers:
+
+In the producer account, create and assign Lake Formation (LF) tags to the consumers (consumer accounts) to define their data access and permissions.
+No Need to Create the Resource Link in Producer Side:
+
+Since the producer account is maintaining the consumers, there is no need to create resource links in the producer account.
+Create Resource Link for the DBs in the Consumer Account:
+
+In each consumer account, create a resource link to associate the relevant databases with Lake Formation. This will enable Lake Formation to manage access to the databases in the consumer accounts.
+Athena Can Access the Data:
+
+Once the resource links are created, Athena (in the consumer accounts) can now access and query the data stored in the databases associated with Lake Formation.
