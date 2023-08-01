@@ -1,28 +1,18 @@
-We raised the request based on understanding of, the AWS account 11251 functions as the producer account, and account 2342 was mentioned as the central lake formation account, although this account number is incorrect.
+Yes, to fully leverage the capabilities of AWS Lake Formation, you need to register the S3 bucket location in Lake Formation. Registering an S3 bucket in Lake Formation's data lake location is a crucial step to enable centralized management and governance of data access and permissions for the data stored in that bucket.
 
-The roles I granted access to in the producer account (account 11251) do not possess admin privileges to assign grants to consumer accounts.
+When you register an S3 bucket in Lake Formation, it allows Lake Formation to integrate with the AWS Glue Data Catalog and track the metadata of the data stored in that bucket. The Glue Data Catalog acts as a central repository for storing schema and metadata information about the data in the data lake.
 
-Based on the current setup, the central lake formation AWS Account has the account ID 5880, and the producer account has the account ID 11251.
+On the producer side:
 
-Lake Formation tags (LF tags) and Table access details are derived from the central lake formation account (account 5880) and applied to the producer account (account 11251).
+Register S3 buckets in Lake Formation within the Data Lake location.
+Create the LF tag.
+Establish the database or table and assign the LF tag to the database. If LF tags are not assigned to tables or columns, they will inherit the tag from the database. Additionally, there is an option to include extra LF tags or override the existing ones.
+Grant from the producer side:
+4. Provide the LF tag details for use in the consumer account.
 
-I have scheduled a meeting with Ram to gain a better understanding of how Lake Formation is currently implemented and to validate the current account details.
+Grant the LF tag to the consumer account, offering the advantage of making all tags associated with the database, table, or column available on the consumer side with just one grant. Lines 3 and 4 in the diagram facilitate permission grants based on this setup.
+Consumer side:
+5. Once the LF tag details are shared, the consumer account's RAM will accept the shared invitation.
 
-
-Based on the discussion, the implementation for the producer account maintaining the consumers and setting up Lake Formation, including resource links and Athena access, can be represented as follows:
-
-Setup of Lake Formation in an AWS Account:
-
-In the producer account, set up Lake Formation to manage data access and permissions.
-Assign Respective LF Tags to the Consumers:
-
-In the producer account, create and assign Lake Formation (LF) tags to the consumers (consumer accounts) to define their data access and permissions.
-No Need to Create the Resource Link in Producer Side:
-
-Since the producer account is maintaining the consumers, there is no need to create resource links in the producer account.
-Create Resource Link for the DBs in the Consumer Account:
-
-In each consumer account, create a resource link to associate the relevant databases with Lake Formation. This will enable Lake Formation to manage access to the databases in the consumer accounts.
-Athena Can Access the Data:
-
-Once the resource links are created, Athena (in the consumer accounts) can now access and query the data stored in the databases associated with Lake Formation.
+Create a resource link specifically for the database on the target side.
+By leveraging this resource link, users can query the Athena table on the consumer side and access the data stored in the S3 bucket.
