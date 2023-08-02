@@ -1,4 +1,15 @@
-During the meeting, we discussed the transition of DIS-DQCS from an on-premise setup to the AWS Cloud environment. Paoli provided the approval for the WAF document, which is a crucial step towards moving forward with this migration and Several important suggestions and actions were taken.
+During the meeting, we discussed the transition of DIS-DQCS from an on-premise setup to the AWS Cloud environment. 
+
+Key items discussed:
+
+DIS-DQCS Migration Approach
+Reason for Considering Few AWS Services. ECS-Fargate, Postgres
+Backup Region Approach Considering the RTO
+Enhancement of Data transmission capture in DQCS
+
+Approval:  Paoli provided the approval for the WAF document and earlier Todd provide his approval. 
+
+Key takeaways and Action taken.
 
 Suggestion to include all applications in both the consumer risk platform and the CCB Risk strategy in the product overview page. To address this, changes were made in the presentation slides (PPT). The updated version has been attached for reference.
 
