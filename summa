@@ -1,28 +1,5 @@
-Central Lake Formation Account:
+jdbc:awsathena://AwsRegion=us-east-1;Profile=default;
 
-S3 Location of Producer Account (Registered in the Central Lake Account with the above IAM Role)
-Datalake Location Shared with Producer (Create the databases in the Central Lake Formation Account).
-Producer Account:
 
-Create the LF Tag permissions and Grant to Producer Account
-Assigning the LF Tag to databases.
-Grant the LF Tag for the databases and tables (even tables that do not exist as of now) and also Data location access.
-Central Lake Formation Account:
-
-Accept the Grant from the central lake formation account using the ProducerLakeformationadmin account.
-The database created in the producer account now appears in the Producer account.
-Create a resource link for the shared database.
-ProducerLakeformationadmin assigns the necessary LF Tag and other permissions to the Producer AWS Glue Service Role.
-Grant the Glue service role on the data location, LF Tag, and DB Permission.
-Run the Crawler, and now tables appear under the resource link of the database.
-LF Tags automatically inherit the tables from the database.
-Central Lake Formation Account:
-
-The tables created in the producer account are now available in the Central Lake Formation account.
-Now assign further LF tags at the column level. (This will appear in the Producer account as well).
-Grant access to the consumer account based on LF Tag.
-Consumer Account:
-
-Accept the Grant from the central lake formation account using the ConsumerLakeformationadmin account.
-Now the database and tables appear on the Consumer side.
-Create the resource link for the databases and now able to query the Athena tables based on the granted LF Tag.
+s3OutputLocation s3://athenaoutput909999
+S3OutputEncOption SSE_S3
