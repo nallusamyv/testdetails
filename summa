@@ -1,2 +1,4 @@
-aws s3api list-buckets --query "Buckets[].Name" --output text | \
-  xargs -I {} aws s3api get-bucket-lifecycle-configuration --bucket {} --query "Rules" --output json
+$bucketNames = (aws s3api list-buckets --query "Buckets[].Name" --output text).split("`n")
+foreach ($bucket in $bucketNames) {
+    aws s3api get-bucket-lifecycle-configuration --bucket $bucket --query "Rules" --output json
+}
