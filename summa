@@ -1,4 +1,43 @@
+import boto3
+import csv
+from io import StringIO
 
-I've looked into and gathered information about the Splunk Machine Learning Toolkit (MLTK). It's a feature that comes built-in with Splunk starting from version 7, and it offers a wide range of capabilities. If we're using a version of Splunk that is 7.0.0 or newer, we can make use of this feature.
-I have an expectation that our Splunk version is equal to or higher than 7.0
-I've come across a presentation that showcases the implementation of the Splunk MLTK toolkit within our organization. This presentation confirms that they have implemented it using versions 7.x exclusively. I will be scheduling a meeting with some colleagues to gather more information, and I'll provide you with further details afterwards.
+# Initialize Boto3 S3 Access Point client
+access_point_client = boto3.client('s3control')
+
+# Get list of all S3 Access Points
+response = access_point_client.list_access_points()
+access_points = response['AccessPointList']
+
+csv_buffer = StringIO()
+csv_writer = csv.writer(csv_buffer)
+
+csv_writer.writerow(["Bucket Name", "Access Point Name", "Effect", "Principal", "Action", "Resource"])
+
+for access_point in access_points:
+    access_point_name = access_point['Name']
+
+    # Get Access Point policy
+    policy_response = access_point_client.get_access_point_policy(
+        AccountId='YOUR_ACCOUNT_ID',
+        Name=access_point_name
+    )
+    policy = policy_response['Policy']
+
+    for statement in policy['Statement']:
+        effect = statement['Effect']
+        principal = statement.get('Principal', '')
+        action = ', '.join(statement.get('Action', []))
+        resource = ', '.join(statement.get('Resource', []))
+
+        bucket_name = resource.split(":::")[-1] if ":::" in resource else ""
+
+        csv_writer.writerow([bucket_name, access_point_name, effect, principal, action, resource])
+
+csv_buffer.seek(0)
+
+# Write CSV data to a file
+with open("access_point_policies.csv", "w") as csv_file:
+    csv_file.write(csv_buffer.read())
+
+print("CSV file 'access_point_policies.csv' has been created.")
