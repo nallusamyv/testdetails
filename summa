@@ -1,40 +1,4 @@
-import boto3
-import csv
 
-# Configure Boto3 to use specific AWS account credentials
-aws_access_key = 'YOUR_ACCESS_KEY'
-aws_secret_key = 'YOUR_SECRET_KEY'
-region = 'YOUR_REGION'  # e.g., 'us-east-1'
-
-# Initialize the Boto3 Lake Formation client
-lf_client = boto3.client('lakeformation', aws_access_key_id=aws_access_key, aws_secret_access_key=aws_secret_key, region_name=region)
-
-# Replace 'output_permissions.csv' with the desired output CSV file name
-output_csv = 'output_permissions.csv'
-
-# Get all data lake permissions
-response = lf_client.list_permissions()
-
-# Extract permissions details
-permissions = response['PrincipalResourcePermissions']
-
-# Prepare CSV header
-csv_header = ['PrincipalType', 'PrincipalARN', 'ResourceType', 'Catalog', 'Database', 'Table', 'LFTagExpression', 'Grantable', 'Permissions']
-with open(output_csv, 'w', newline='') as csvfile:
-    csvwriter = csv.writer(csvfile)
-    csvwriter.writerow(csv_header)
-
-    # Write permissions to CSV file
-    for permission in permissions:
-        principal_type = permission['Principal']['DataLakePrincipalType']
-        principal_arn = permission['Principal']['DataLakePrincipalIdentifier']
-        resource_type = permission['Resource']['Type']
-        catalog = permission['Resource']['Catalog']
-        database = permission['Resource']['Database']
-        table = permission['Resource']['Table']
-        lf_tag_expr = permission['Resource']['TableWithColumns']['Expression']
-        grantable = permission['PermissionsWithGrantOption']
-        permission_list = ', '.join(permission['Permissions'])
-        csvwriter.writerow([principal_type, principal_arn, resource_type, catalog, database, table, lf_tag_expr, grantable, permission_list])
-
-print(f"Permissions written to {output_csv}")
+I've looked into and gathered information about the Splunk Machine Learning Toolkit (MLTK). It's a feature that comes built-in with Splunk starting from version 7, and it offers a wide range of capabilities. If we're using a version of Splunk that is 7.0.0 or newer, we can make use of this feature.
+I have an expectation that our Splunk version is equal to or higher than 7.0
+I've come across a presentation that showcases the implementation of the Splunk MLTK toolkit within our organization. This presentation confirms that they have implemented it using versions 7.x exclusively. I will be scheduling a meeting with some colleagues to gather more information, and I'll provide you with further details afterwards.
