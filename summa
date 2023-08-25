@@ -1,3 +1,40 @@
-aws s3api list-buckets --query "Buckets[].Name" --output text | tr ' ' '\n' | while read bucket; do
-    aws s3api get-bucket-lifecycle-configuration --bucket "$bucket" --query "Rules" --output json
-done
+import boto3
+import csv
+
+# Configure Boto3 to use specific AWS account credentials
+aws_access_key = 'YOUR_ACCESS_KEY'
+aws_secret_key = 'YOUR_SECRET_KEY'
+region = 'YOUR_REGION'  # e.g., 'us-east-1'
+
+# Initialize the Boto3 Lake Formation client
+lf_client = boto3.client('lakeformation', aws_access_key_id=aws_access_key, aws_secret_access_key=aws_secret_key, region_name=region)
+
+# Replace 'output_permissions.csv' with the desired output CSV file name
+output_csv = 'output_permissions.csv'
+
+# Get all data lake permissions
+response = lf_client.list_permissions()
+
+# Extract permissions details
+permissions = response['PrincipalResourcePermissions']
+
+# Prepare CSV header
+csv_header = ['PrincipalType', 'PrincipalARN', 'ResourceType', 'Catalog', 'Database', 'Table', 'LFTagExpression', 'Grantable', 'Permissions']
+with open(output_csv, 'w', newline='') as csvfile:
+    csvwriter = csv.writer(csvfile)
+    csvwriter.writerow(csv_header)
+
+    # Write permissions to CSV file
+    for permission in permissions:
+        principal_type = permission['Principal']['DataLakePrincipalType']
+        principal_arn = permission['Principal']['DataLakePrincipalIdentifier']
+        resource_type = permission['Resource']['Type']
+        catalog = permission['Resource']['Catalog']
+        database = permission['Resource']['Database']
+        table = permission['Resource']['Table']
+        lf_tag_expr = permission['Resource']['TableWithColumns']['Expression']
+        grantable = permission['PermissionsWithGrantOption']
+        permission_list = ', '.join(permission['Permissions'])
+        csvwriter.writerow([principal_type, principal_arn, resource_type, catalog, database, table, lf_tag_expr, grantable, permission_list])
+
+print(f"Permissions written to {output_csv}")
