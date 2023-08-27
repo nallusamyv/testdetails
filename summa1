@@ -64,4 +64,83 @@ These approaches offer flexibility and security by separating data access from d
 
 
 
+identify and move the data to Glacier if the partition date is greater than 365 days.
+Here's a high-level overview of how you can achieve this:
+1. AWS Lambda:
+Write an AWS Lambda function that triggers when a new object is created in the "card" and "bank" folders. The Lambda function will evaluate the created_date partition from the object's metadata and move the object to the Glacier storage class if the date is greater than 365 days.
+Here's a simplified example of how the Lambda function might look:
 
+import boto3
+from datetime import datetime, timedelta
+
+s3_client = boto3.client('s3')
+
+def lambda_handler(event, context):
+    for record in event['Records']:
+        bucket_name = record['s3']['bucket']['name']
+        object_key = record['s3']['object']['key']
+        
+        # Fetch created_date from object metadata (you need to implement this part)
+        created_date = get_created_date_from_metadata(bucket_name, object_key)
+        
+        if created_date is not None and (datetime.now() - created_date) > timedelta(days=365):
+            # Move object to Glacier storage class
+            s3_client.copy_object(
+                CopySource={'Bucket': bucket_name, 'Key': object_key},
+                Bucket=bucket_name,
+                Key=object_key,
+                StorageClass='GLACIER'
+            )
+            # Delete the original object from the standard storage class
+            s3_client.delete_object(Bucket=bucket_name, Key=object_key)
+
+def get_created_date_from_metadata(bucket_name, object_key):
+    # Implement logic to extract created_date from object metadata
+    # Return None if metadata or created_date is not available
+    return None
+
+2. S3 Event Trigger:
+Configure the AWS Lambda function to be triggered by the S3 "ObjectCreated" event in both the "card" and "bank" folders.
+Important Note:
+•	The Lambda function code is a simplified example and should be extended to handle actual metadata extraction and other error cases.
+•	Make sure to test the Lambda function thoroughly in a controlled environment before deploying it to production.
+•	AWS Lambda execution costs and S3 data transfer costs will apply when objects are moved between storage classes.
+This approach requires development and testing effort but allows you to transition data to Glacier based on the created_date import boto3
+
+s3_client = boto3.client('s3')
+
+def lambda_handler(event, context):
+    for record in event['Records']:
+        bucket_name = record['s3']['bucket']['name']
+        object_key = record['s3']['object']['key']
+        
+        # Fetch the partitioning field value from object metadata
+        partition_field_value = get_partition_field_value(bucket_name, object_key)
+        
+        if partition_field_value is not None and should_move_to_glacier(partition_field_value):
+            # Move object to Glacier storage class
+            s3_client.copy_object(
+                CopySource={'Bucket': bucket_name, 'Key': object_key},
+                Bucket=bucket_name,
+                Key=object_key,
+                StorageClass='GLACIER'
+            )
+            # Delete the original object from the standard storage class
+            s3_client.delete_object(Bucket=bucket_name, Key=object_key)
+
+def get_partition_field_value(bucket_name, object_key):
+    # Implement logic to extract the partitioning field value from object metadata
+    # In this example, we assume the field name is "product_category"
+    try:
+        response = s3_client.head_object(Bucket=bucket_name, Key=object_key)
+        metadata = response.get('Metadata', {})
+        partition_field_value = metadata.get('product_category')
+        return partition_field_value
+    except Exception as e:
+        print("Error retrieving partition field value:", str(e))
+        return None
+
+def should_move_to_glacier(partition_field_value):
+    # Implement your criteria for moving to Glacier based on the partition field value
+    # In this example, we assume "electronics" category is moved to Glacier
+    return partition_field_value == 'electronics'partition.
