@@ -143,4 +143,4 @@ def get_partition_field_value(bucket_name, object_key):
 def should_move_to_glacier(partition_field_value):
     # Implement your criteria for moving to Glacier based on the partition field value
     # In this example, we assume "electronics" category is moved to Glacier
-    return partition_field_value == 'electronics'partition.
+    return partition_field_value == 'electronics'partition
