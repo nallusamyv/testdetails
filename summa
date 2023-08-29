@@ -1,43 +1,53 @@
 import boto3
 import csv
-from io import StringIO
+import json
 
-# Initialize Boto3 S3 Access Point client
-access_point_client = boto3.client('s3control')
+# Initialize the S3 client
+s3_client = boto3.client('s3')
 
-# Get list of all S3 Access Points
-response = access_point_client.list_access_points()
-access_points = response['AccessPointList']
+# Specify the name of the S3 bucket
+bucket_name = 'your-bucket-name'
 
-csv_buffer = StringIO()
-csv_writer = csv.writer(csv_buffer)
+# Specify the output CSV file path
+output_csv_file = 'access_point_policies.csv'
 
-csv_writer.writerow(["Bucket Name", "Access Point Name", "Effect", "Principal", "Action", "Resource"])
+try:
+    # Get the list of access points for the specified bucket
+    access_point_response = s3_client.list_access_points(Bucket=bucket_name)
 
-for access_point in access_points:
-    access_point_name = access_point['Name']
+    # Prepare the CSV file for writing
+    with open(output_csv_file, 'w', newline='') as csv_file:
+        fieldnames = ['Bucket', 'Access Point', 'Effect', 'Principal', 'Action', 'Resource']
+        csv_writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+        csv_writer.writeheader()
 
-    # Get Access Point policy
-    policy_response = access_point_client.get_access_point_policy(
-        AccountId='YOUR_ACCOUNT_ID',
-        Name=access_point_name
-    )
-    policy = policy_response['Policy']
+        # Iterate through the list of access points
+        for access_point in access_point_response['AccessPointList']:
+            access_point_name = access_point['Name']
 
-    for statement in policy['Statement']:
-        effect = statement['Effect']
-        principal = statement.get('Principal', '')
-        action = ', '.join(statement.get('Action', []))
-        resource = ', '.join(statement.get('Resource', []))
+            # Get the access point policy
+            access_point_policy_response = s3_client.get_access_point_policy(
+                AccountId='your-account-id',
+                Name=access_point_name
+            )
+            access_point_policy = access_point_policy_response['Policy']
 
-        bucket_name = resource.split(":::")[-1] if ":::" in resource else ""
+            # Parse the policy to extract "Allow" statements and write to CSV
+            parsed_policy = json.loads(access_point_policy)
+            allow_statements = parsed_policy.get('Statement', [])
+            allow_statements = [statement for statement in allow_statements if statement.get('Effect') == 'Allow']
 
-        csv_writer.writerow([bucket_name, access_point_name, effect, principal, action, resource])
+            for statement in allow_statements:
+                csv_writer.writerow({
+                    'Bucket': bucket_name,
+                    'Access Point': access_point_name,
+                    'Effect': statement.get('Effect'),
+                    'Principal': statement.get('Principal'),
+                    'Action': ','.join(statement.get('Action', [])),
+                    'Resource': ','.join(statement.get('Resource', []))
+                })
 
-csv_buffer.seek(0)
+    print("CSV output written to", output_csv_file)
 
-# Write CSV data to a file
-with open("access_point_policies.csv", "w") as csv_file:
-    csv_file.write(csv_buffer.read())
-
-print("CSV file 'access_point_policies.csv' has been created.")
+except Exception as e:
+    print("Error:", e)
