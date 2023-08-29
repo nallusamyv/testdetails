@@ -1,146 +1,37 @@
 
-Swathi is skilled in the DRB process and is putting in extra effort to implement it across CCB Risk. She has conducted training for the team to ensure the DRB process is followed consistently throughout CCB Risk. Being a new member of the firm, like me, she is easy to approach.
+Epic Short Description:
+Generate Comprehensive Lake Formation Principal Assignment Report for DS AWS Producer Production Account to Validate Access Permissions Across IAM Roles(with in the DS account) and Lake Formation AWS Accounts or any Consumer AWS Accounts..
 
-Current Process: Currently, consumers request access through AIMS to specific folders within the producer account's S3 bucket. S3 access points are established at the folder level upon approval by the producer application owner team. However, the existing CADS approach presents issues:
-1.	Consumers lack clarity about the specific model outputs or model-derived features they're accessing due to inadequate information at the S3 bucket or folder level.
-2.	When multiple files exist within a folder, consumers can access all files instead of only the intended model output or model-derived feature, potentially leading to unauthorized access.
-Proposed Solutions:
-Solution #1	Prefix S3 files with "model output" or "Model derived feature" and grant access based on the prefix.
-Solution #2	Create dedicated folders for each model or model feature and provide access at the folder level.
-Solution #3	Implement S3 object tagging to indicate the model output or model feature name.
-Feasibility of Solutions: While Solutions #1 and #2 are feasible within the current S3 capabilities, Solution #3 (tagging) might not be directly usable for access control.
-Pros and Cons:
-	Solution #1	Solution #2	Solution #3
-Pros	- Clear identification through prefixes.<br>- Access control based on standardized naming.<br>- No major architectural changes needed.	- Clearly segregated folders for different models/features.<br>- Granular access control at folder level.<br>- Better organization of data.<br>- Existing approach enhanced.	- Potential for more detailed metadata management.<br>- Could serve as useful metadata for other purposes (e.g., analytics).
-Cons	- Naming convention adherence is necessary.<br>- Risk of naming conflicts if not managed properly.	- Additional folder creation required for each model/feature.<br>- Requires reorganization of data and access points.	- Limited applicability for direct access control in S3.<br>- Might require custom logic or integration for access control based on tags.
-Summary:
-•	Solution #1 offers straightforward access control using prefixes.
-•	Solution #2 improves organization but requires additional folder management.
-•	Solution #3, while potentially useful for metadata, might require additional custom implementation for direct access control.
-It's important to consider your specific use case, the nature of your data, and the technical capabilities available within your organization before deciding on the best solution. Consulting with AWS support or cloud architects can provide more insights based on the latest platform features and best practices.
+Detailed Description:
+This report helps verify and validate the security posture of the Lake Formation environment and ensures that access rights align with intended policies and the below information to be extracted for all the
+IAM Roles(with in the DS account) and Lake Formation AWS Accounts or any Consumer AWS Accounts..
 
+Principal: The entity (user, group, role) to which permissions are granted.
+Principal Type: Indicates whether it's a user, group, or role.
+Principal ARN: The Amazon Resource Name (ARN) of the principal.
+Resource Type: Specifies the type of resource (e.g., database, table).
+Database: Name of the database associated with the resource.
+Table: Name of the table associated with the resource.
+Resource: The specific resource name (e.g., column) within the table.
+Catalog: Name of the Lake Formation Data Catalog.
+LF-Tag Expressions: Any Lake Formation tag expressions applied.
+Permissions: The permissions granted to the principal for the resource.
+Grantable: Whether the principal can grant these permissions to others.
+RAM Resource Share: If applicable, the AWS Resource Access Manager (RAM) resource share.
 
-Solution1 or Solution2 is the approach 
+Definition of Done:
 
-
-
-Approach Execution Steps:
-1.	Obtain the CADS report encompassing Consumer IAM Application roles, producer's S3 Access points, and S3 folder hierarchy.
-2.	Consumers validate their IAM roles and stipulate their intent for S3 access, detailing the specific model or output they require.
-3.	Apply a naming prefix to all S3 files, reflecting either model output or Model-derived features. CADS requests will include references to the S3 bucket, path, and prefixed file.
-Roadmap to Realize the Approach: 
-A. Introduction of New S3 Files Prefixed with Model Indicators:
-1.	Create novel S3 files within the producer's bucket, applying a prefix aligned with the model output or Model-derived feature.
-2.	The files should reside within meticulously structured folders that integrate the designated model output or Model-derived feature prefix.
-3.	Initiate AIMS requests, specifically seeking access to the new S3 files that conform to the prefixed model output or Model-derived feature designation.
-4.	Mandate approval of AIMS requests by either the application owner or the data owner.
-B. Refinement of Existing S3 Files through Prefix Renaming:
-1.	Categorize existing S3 files in accordance with their corresponding model output or Model-derived feature.
-2.	Modify the filenames of existing files to incorporate the appropriate model output or Model-derived feature prefix.
-3.	Revise the access policies of existing S3 Access points, aligning them with the model output or Model-derived feature prefixed S3 files.
-
-
-
-AWS Lake Formation can be used instead of directly accessing S3 access points using two main approaches: the Lake Formation (LF) tagged approach and the Data Catalog resource name approach. Both of these approaches provide centralized access control and data sharing without the need for consumers to directly interact with S3 access points. Here's how each approach works:
-1. Lake Formation Tagged Approach: In this approach, you use Lake Formation tags to control access to data at a more granular level. You associate specific tags with certain data elements and enforce access control based on those tags. Here's how it works:
-1.	Tagging Data: Assign Lake Formation tags to the data sources (tables) in your AWS Glue Data Catalog. For example, you could tag tables with labels like "Card" and "Bank" based on the categories you mentioned.
-2.	Lake Formation Permissions:
-•	Create Lake Formation permissions that reference the tags you've assigned.
-•	Define permissions for different roles or users based on the tags.
-•	For example, you can grant access to tables with the "Card" tag only to consumers who have the relevant IAM role.
-3.	Accessing Data: Consumers query the data using services like Athena or Redshift Spectrum. Lake Formation checks the permissions associated with the tags and allows or denies access accordingly.
-2. Data Catalog Resource Name Approach: In this approach, you use the resource names of the tables in the Data Catalog to control access. Each table is treated as a distinct resource, and permissions are granted based on these resource names. Here's how it works:
-1.	Cataloging Tables: Catalog your tables in the AWS Glue Data Catalog. Each table is assigned a unique resource name.
-2.	Lake Formation Permissions:
-•	Create Lake Formation permissions that reference the resource names of the tables.
-•	Define permissions for different roles or users based on the resource names.
-•	For instance, you can grant access to the "cards" table only to specific IAM roles.
-3.	Accessing Data: Consumers query the data using services like Athena or Redshift Spectrum. Lake Formation verifies the permissions associated with the resource names to determine access.
-Benefits of Using These Approaches:
-•	Simplified Access: Consumers don't need to manage S3 access points. They interact with the data using familiar AWS query services.
-•	Centralized Control: Permissions and sharing are managed within Lake Formation, providing a centralized access control layer.
-•	Granular Access: Both approaches offer granular access control down to the tag or resource name level, enhancing security.
-These approaches offer flexibility and security by separating data access from direct S3 interactions and enabling controlled sharing across AWS accounts. The specific approach you choose will depend on your data organization and security requirements.
-
-
-
-identify and move the data to Glacier if the partition date is greater than 365 days.
-Here's a high-level overview of how you can achieve this:
-1. AWS Lambda:
-Write an AWS Lambda function that triggers when a new object is created in the "card" and "bank" folders. The Lambda function will evaluate the created_date partition from the object's metadata and move the object to the Glacier storage class if the date is greater than 365 days.
-Here's a simplified example of how the Lambda function might look:
-
-import boto3
-from datetime import datetime, timedelta
-
-s3_client = boto3.client('s3')
-
-def lambda_handler(event, context):
-    for record in event['Records']:
-        bucket_name = record['s3']['bucket']['name']
-        object_key = record['s3']['object']['key']
-        
-        # Fetch created_date from object metadata (you need to implement this part)
-        created_date = get_created_date_from_metadata(bucket_name, object_key)
-        
-        if created_date is not None and (datetime.now() - created_date) > timedelta(days=365):
-            # Move object to Glacier storage class
-            s3_client.copy_object(
-                CopySource={'Bucket': bucket_name, 'Key': object_key},
-                Bucket=bucket_name,
-                Key=object_key,
-                StorageClass='GLACIER'
-            )
-            # Delete the original object from the standard storage class
-            s3_client.delete_object(Bucket=bucket_name, Key=object_key)
-
-def get_created_date_from_metadata(bucket_name, object_key):
-    # Implement logic to extract created_date from object metadata
-    # Return None if metadata or created_date is not available
-    return None
-
-2. S3 Event Trigger:
-Configure the AWS Lambda function to be triggered by the S3 "ObjectCreated" event in both the "card" and "bank" folders.
-Important Note:
-•	The Lambda function code is a simplified example and should be extended to handle actual metadata extraction and other error cases.
-•	Make sure to test the Lambda function thoroughly in a controlled environment before deploying it to production.
-•	AWS Lambda execution costs and S3 data transfer costs will apply when objects are moved between storage classes.
-This approach requires development and testing effort but allows you to transition data to Glacier based on the created_date import boto3
-
-s3_client = boto3.client('s3')
-
-def lambda_handler(event, context):
-    for record in event['Records']:
-        bucket_name = record['s3']['bucket']['name']
-        object_key = record['s3']['object']['key']
-        
-        # Fetch the partitioning field value from object metadata
-        partition_field_value = get_partition_field_value(bucket_name, object_key)
-        
-        if partition_field_value is not None and should_move_to_glacier(partition_field_value):
-            # Move object to Glacier storage class
-            s3_client.copy_object(
-                CopySource={'Bucket': bucket_name, 'Key': object_key},
-                Bucket=bucket_name,
-                Key=object_key,
-                StorageClass='GLACIER'
-            )
-            # Delete the original object from the standard storage class
-            s3_client.delete_object(Bucket=bucket_name, Key=object_key)
-
-def get_partition_field_value(bucket_name, object_key):
-    # Implement logic to extract the partitioning field value from object metadata
-    # In this example, we assume the field name is "product_category"
-    try:
-        response = s3_client.head_object(Bucket=bucket_name, Key=object_key)
-        metadata = response.get('Metadata', {})
-        partition_field_value = metadata.get('product_category')
-        return partition_field_value
-    except Exception as e:
-        print("Error retrieving partition field value:", str(e))
-        return None
-
-def should_move_to_glacier(partition_field_value):
-    # Implement your criteria for moving to Glacier based on the partition field value
-    # In this example, we assume "electronics" category is moved to Glacier
-    return partition_field_value == 'electronics'partition
+The report is available in CSV format, as per the requested format.
+All required fields are accurately extracted and present with CSV format.
+Principal
+Principal Type
+Principal ARN
+Resource Type
+Database
+Table
+Resource
+Catalog
+LF-Tag Expressions
+Permissions
+Grantable
+RAM Resource Share
