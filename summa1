@@ -1,36 +1,56 @@
+import boto3
+import csv
 
-Epic Short Description:
+# Initialize the Lake Formation client
+lf_client = boto3.client('lakeformation')
 
-Detailed Description:
-Generate Comprehensive Lake Formation Principal Assignment Report for DS AWS Producer Production Account to Validate Access Permissions Across IAM Roles(with in the DS account) and Lake Formation AWS Accounts or any Consumer AWS Accounts..
-This report helps verify and validate the security posture of the Lake Formation environment and ensures that access rights align with intended policies and the below information to be extracted.
+# Specify the name of the Lake Formation catalog
+catalog_name = 'my-catalog'
 
-Principal: The entity (user, group, role) to which permissions are granted.
-Principal Type: Indicates whether it's a user, group, or role.
-Principal ARN: The Amazon Resource Name (ARN) of the principal.
-Resource Type: Specifies the type of resource (e.g., database, table).
-Database: Name of the database associated with the resource.
-Table: Name of the table associated with the resource.
-Resource: The specific resource name (e.g., column) within the table.
-Catalog: Name of the Lake Formation Data Catalog.
-LF-Tag Expressions: Any Lake Formation tag expressions applied.
-Permissions: The permissions granted to the principal for the resource.
-Grantable: Whether the principal can grant these permissions to others.
-RAM Resource Share: If applicable, the AWS Resource Access Manager (RAM) resource share.
+# Specify the output CSV file path
+output_csv_file = 'lake_formation_permissions.csv'
 
-Definition of Done:
+try:
+    # Get the list of databases in the catalog
+    database_response = lf_client.list_databases(CatalogId='account-id', CatalogName=catalog_name)
 
-The report is available in CSV format, as per the requested format.
-All required fields are accurately extracted and present with CSV format.
-Principal
-Principal Type
-Principal ARN
-Resource Type
-Database
-Table
-Resource
-Catalog
-LF-Tag Expressions
-Permissions
-Grantable
-RAM Resource Share
+    # Prepare the CSV file for writing
+    with open(output_csv_file, 'w', newline='') as csv_file:
+        fieldnames = ['Principal', 'Principal Type', 'Principal ARN', 'Database', 'Table', 'Permissions', 'Grantable']
+        csv_writer = csv.DictWriter(csv_file, fieldnames=fieldnames, delimiter='|')
+        csv_writer.writeheader()
+
+        # Iterate through the list of databases
+        for database in database_response['DatabaseList']:
+            database_name = database['Name']
+
+            # Get the list of tables in the database
+            table_response = lf_client.list_tables(CatalogId='account-id', DatabaseName=database_name)
+
+            for table in table_response['TableList']:
+                table_name = table['Name']
+
+                # Get the permissions for the table
+                permissions_response = lf_client.list_permissions(CatalogId='account-id', DatabaseName=database_name, TableWithColumns={'DatabaseName': database_name, 'Name': table_name})
+
+                for permission in permissions_response['PrincipalResourcePermissions']:
+                    principal = permission['Principal']['DataLakePrincipalIdentifier']
+                    principal_type = permission['Principal']['Type']
+                    principal_arn = permission['Principal']['Identifier']
+                    permissions = ', '.join(permission['Permissions'])
+                    grantable = permission['PermissionsWithGrantOption']
+
+                    csv_writer.writerow({
+                        'Principal': principal,
+                        'Principal Type': principal_type,
+                        'Principal ARN': principal_arn,
+                        'Database': database_name,
+                        'Table': table_name,
+                        'Permissions': permissions,
+                        'Grantable': grantable
+                    })
+
+    print("CSV output written to", output_csv_file)
+
+except Exception as e:
+    print("Error:", e)
