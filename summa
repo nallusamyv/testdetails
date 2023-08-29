@@ -38,14 +38,19 @@ try:
             allow_statements = [statement for statement in allow_statements if statement.get('Effect') == 'Allow']
 
             for statement in allow_statements:
-                csv_writer.writerow({
-                    'Bucket': bucket_name,
-                    'Access Point': access_point_name,
-                    'Effect': statement.get('Effect'),
-                    'Principal': statement.get('Principal'),
-                    'Action': ','.join(statement.get('Action', [])),
-                    'Resource': ','.join(statement.get('Resource', []))
-                })
+                resource_values = statement.get('Resource', [])
+                if isinstance(resource_values, str):
+                    resource_values = [resource_values]
+
+                for resource in resource_values:
+                    csv_writer.writerow({
+                        'Bucket': bucket_name,
+                        'Access Point': access_point_name,
+                        'Effect': statement.get('Effect'),
+                        'Principal': statement.get('Principal'),
+                        'Action': ','.join(statement.get('Action', [])),
+                        'Resource': resource
+                    })
 
     print("CSV output written to", output_csv_file)
 
