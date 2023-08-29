@@ -1,10 +1,9 @@
 
 Epic Short Description:
-Generate Comprehensive Lake Formation Principal Assignment Report for DS AWS Producer Production Account to Validate Access Permissions Across IAM Roles(with in the DS account) and Lake Formation AWS Accounts or any Consumer AWS Accounts..
 
 Detailed Description:
-This report helps verify and validate the security posture of the Lake Formation environment and ensures that access rights align with intended policies and the below information to be extracted for all the
-IAM Roles(with in the DS account) and Lake Formation AWS Accounts or any Consumer AWS Accounts..
+Generate Comprehensive Lake Formation Principal Assignment Report for DS AWS Producer Production Account to Validate Access Permissions Across IAM Roles(with in the DS account) and Lake Formation AWS Accounts or any Consumer AWS Accounts..
+This report helps verify and validate the security posture of the Lake Formation environment and ensures that access rights align with intended policies and the below information to be extracted.
 
 Principal: The entity (user, group, role) to which permissions are granted.
 Principal Type: Indicates whether it's a user, group, or role.
