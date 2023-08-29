@@ -1,0 +1,24 @@
+import boto3
+
+# Initialize the S3 client
+s3_client = boto3.client('s3')
+
+try:
+    # Get the list of all S3 buckets in the account
+    bucket_response = s3_client.list_buckets()
+
+    # Iterate through each bucket
+    for bucket in bucket_response['Buckets']:
+        bucket_name = bucket['Name']
+        print(f"Bucket: {bucket_name}")
+
+        # List objects in the bucket, but only directories (common prefixes)
+        objects_response = s3_client.list_objects_v2(Bucket=bucket_name, Delimiter='/')
+
+        # Iterate through common prefixes (subfolders)
+        for prefix in objects_response.get('CommonPrefixes', []):
+            subfolder_name = prefix['Prefix']
+            print(f" - Subfolder: {subfolder_name}")
+
+except Exception as e:
+    print("Error:", e)
