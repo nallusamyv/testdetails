@@ -1,2 +1,5 @@
+Our initial assumption about the problem is accurate. The access points were established for distinct folder earliers, but those folders have since been deleted. 
 
-If you have defined an S3 Access Point policy that includes a specific "prefix" (logical path or folder) and you later delete that folder, the S3 Access Point policy will still remain as is. However, the policy's effectiveness and applicability will change based on the existing objects and their keys (paths) within the bucket.
+But the problem is not in the CADS report and its about S3 access point behaviour. If you have defined an S3 Access Point policy that includes a specific "prefix" (logical path or folder) and later if the fodler is deleted, the S3 Access Point policy will still remain as is. 
+
+We can create an S3 Access Point even if the (prefix) you intend to use does not yet exist. S3 Access Points provide a way to define logical boundaries for access control, even if the specific prefix doesn't currently have objects associated with it. 
