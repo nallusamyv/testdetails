@@ -1,45 +1,24 @@
 import boto3
-import csv
 
 # Initialize the S3 client
 s3_client = boto3.client('s3')
-
-# Specify the CSV output file path
-output_csv_file = 's3_subfolder_structure.csv'
 
 try:
     # Get the list of all S3 buckets in the account
     bucket_response = s3_client.list_buckets()
 
-    # Prepare the CSV file for writing
-    with open(output_csv_file, 'w', newline='') as csv_file:
-        fieldnames = ['Bucket Name', 'Subfolder Structure']
-        csv_writer = csv.writer(csv_file)
-        csv_writer.writerow(fieldnames)
+    # Iterate through each bucket
+    for bucket in bucket_response['Buckets']:
+        bucket_name = bucket['Name']
+        print(f"Bucket: {bucket_name}")
 
-        # Iterate through each bucket
-        for bucket in bucket_response['Buckets']:
-            bucket_name = bucket['Name']
+        # List objects in the bucket, recursively (including all subfolders)
+        objects_response = s3_client.list_objects_v2(Bucket=bucket_name, Delimiter='/')
 
-            # List objects in the bucket, recursively (including all subfolders)
-            objects_response = s3_client.list_objects_v2(Bucket=bucket_name, Delimiter='/')
-
-            # Collect subfolder paths
-            subfolder_paths = []
-
-            # Iterate through common prefixes (subfolders)
-            for prefix in objects_response.get('CommonPrefixes', []):
-                subfolder_name = prefix['Prefix']
-                subfolder_paths.append(subfolder_name)
-
-            # Write bucket name and subfolder paths to CSV
-            if subfolder_paths:
-                for path in subfolder_paths:
-                    csv_writer.writerow([bucket_name, path])
-            else:
-                csv_writer.writerow([bucket_name, 'No folder exists'])
-
-    print("CSV output written to", output_csv_file)
+        # Iterate through common prefixes (subfolders)
+        for prefix in objects_response.get('CommonPrefixes', []):
+            subfolder_name = prefix['Prefix']
+            print(f" - Subfolder: {subfolder_name}")
 
 except Exception as e:
     print("Error:", e)
