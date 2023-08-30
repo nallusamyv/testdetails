@@ -1,3 +1,2 @@
-Building on our productive discussion from yesterday's session, Seeking your inputs to identify the top 3 assets will hold the highest potential for reusability and benefits. Please complete the below survey to identify those top 3 assets.
 
-Survey Link: 
+If you have defined an S3 Access Point policy that includes a specific "prefix" (logical path or folder) and you later delete that folder, the S3 Access Point policy will still remain as is. However, the policy's effectiveness and applicability will change based on the existing objects and their keys (paths) within the bucket.
