@@ -1,29 +1,27 @@
-Consumer Account AWS services like EC2 and EMR establish their connection to the producer by utilizing an S3 access point, either via a designated prefix or an object tag.
-The IAM roles associated with these services initiate requests for accessing the specified  prefix or object tag through the CAMS. Once a user submits a request for a dedicated prefix or object tag, an S3 access point is established.
+The Model and Model feature objects are structured with object tags, where each object is assigned a unique key-value pair. Consumers access these models and features by using their designated object tags instead of relying on prefix values. Below, we outline the advantages and disadvantages of using this approach:
 
-Please note: To enforce access restrictions, both individual users and the Glue consumer service role should be prevented from accessing the S3 bucket(through S3 Access point) and its associated prefix or object tag used by the producer
+Advantages:
 
-Business users and technical personnel from the Consumer AWS Account access the model output and model feature data through Athena, and in the future, they will also utilize Redshift Spectrum. This access is facilitated through Lake Formation from the producer. Currently, Lake Formation permissions are granted at the database level, enabling users in the Consumer AWS Account to query both the model output and model features within the specific database.(Eventhough terraform approved version allows the Grant based on DB and Table level)
+Clarity and Uniqueness: Object tags provide a clear and unique way to identify and access models and features. They reduce the risk of naming conflicts that might arise with prefix-based systems.
 
-Please note: When access is granted at the table level or when Lake Formation tags are used to restrict access to the table, it becomes straightforward to control and restrict access to the details of the model output and model features contained within that table.(The Lake Formation Grants report, which we've requested from the SRE team, will assist us in identifying whether the Lake Formation access controls are implemented at the database level, table level, or, though less likely, at the Lake Formation tag level).
+Simplicity: Using object tags simplifies the access process for consumers. They can directly reference the specific object they need without the need for complex prefix-based logic.
+
+Scalability: As your system grows with more models and features, object tags scale efficiently. Consumers can continue to use the same approach without adding complexity.
+
+Disadvantages:
+
+Learning Curve: Consumers may need to learn the specific object tags associated with each model and feature, which could pose a learning curve initially.
+
+Object Tag Management: Ensuring the uniqueness and consistency of object tags across the system requires careful management. It's important to prevent clashes or tag duplication.
+
+Complexity in Tag Assignment: Managing and assigning object tags may become complex if there are many models and features with various attributes.
+
+Documentation: To ensure consumers use the correct object tags, thorough documentation is required. This can be time-consuming to create and maintain.
+
+Flexibility: In some cases, prefix-based systems may offer more flexibility in terms of organizing and categorizing objects.
+
+Ultimately, the choice between using object tags and prefix-based naming conventions depends on your specific use case and system requirements. Object tags can offer a clean and scalable approach for identifying and accessing objects, but they also require careful management and documentation to be effective.
 
 
 
-AWS Account A writes the model and its associated features to an S3 bucket using an S3 access point prefix. This prefix choice is appropriate since CMDS credit risk produces both the model output and model features in the Producer S3 Bucket. However, a concern arises when one of the consumers, AWS Account B, accesses the same S3 access point with the identical prefix. This could potentially expose both the model output and model features to the consumer.
 
-
-Problem in this scenario:
-
-AWS services used by consumers can access all the files, whether they pertain to model output or model features, within the mentioned folder.
-Glue database created at a higher-level folder directory, which exposes all the model output and model features as a table to the consumer.
-
-S3 Access point and Glue DB/Table Limitation and Cost
-
-An S3 access point can be established without the need to explicitly define specific prefixes or object tags. Furthermore, if a particular prefix or object tag is initially assigned to the
-access point but is later removed, the S3 access point will retain its association with that prefix or object tag.
-S3 access points can be created at no additional cost, on new buckets as well as your existing buckets, but egress transfer will be charged based on TB(Same as accessing the using the bucket).
-Maximum of 10,000 access points per AWS account per s3 Region.  
-Access point policies are limited to 20 KB in size and You can create a maximum of 10,000 access points per AWS account per Region.
-In AWS Regions where you have more than 1,000 access points, you can’t search for an access point by name in the Amazon S3 console.
-
-Glue DB/Table creation changes for only table's metadata and its very minimal
