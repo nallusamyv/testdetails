@@ -1,1 +1,28 @@
-If we opt for Lake Formation access controls at the database or table level, our corresponding S3 access points will be set up with a prefix matching the model output or model feature. Alternatively, if Lake Formation access is managed through LF tags, our S3 access points will align with object tags.
+import boto3
+
+# Initialize the S3 client
+s3 = boto3.client('s3')
+
+# Name of your S3 bucket
+bucket_name = 'your-bucket-name'
+
+try:
+    # Get the lifecycle configuration for the bucket
+    response = s3.get_bucket_lifecycle_configuration(Bucket=bucket_name)
+
+    # Check if a lifecycle policy exists for the bucket
+    if 'Rules' in response:
+        print("Lifecycle Policy:")
+        for rule in response['Rules']:
+            print(f"Rule ID: {rule.get('ID', 'N/A')}")
+            print(f"Status: {rule.get('Status', 'N/A')}")
+            print(f"Prefix: {rule.get('Prefix', 'N/A')}")
+            print(f"Expiration (Days): {rule.get('Expiration', {}).get('Days', 'N/A')}")
+            print(f"Transition (Days): {rule.get('Transitions', [])[0].get('Days', 'N/A') if rule.get('Transitions') else 'N/A'}")
+            print()
+
+    else:
+        print("No lifecycle policy found for the bucket.")
+
+except Exception as e:
+    print(f"Error: {str(e)}")
