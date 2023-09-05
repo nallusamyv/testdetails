@@ -1,30 +1,29 @@
 import boto3
-import json
 
 # Initialize the S3 client
 s3 = boto3.client('s3')
 
-# List all S3 buckets
-buckets = [bucket['Name'] for bucket in s3.list_buckets()['Buckets']]
+# List all S3 buckets in your account
+buckets = s3.list_buckets()['Buckets']
 
-# Create a dictionary to store bucket names and their lifecycle configurations
-bucket_lifecycle_configs = {}
+# Create a list to store subfolder names
+subfolders = []
 
-# Iterate through each bucket and get its lifecycle configuration
-for bucket_name in buckets:
-    try:
-        response = s3.get_bucket_lifecycle_configuration(Bucket=bucket_name)
-        lifecycle_configuration = response['Rules']
-        bucket_lifecycle_configs[bucket_name] = lifecycle_configuration
-    except s3.exceptions.NoSuchLifecycleConfiguration:
-        # If the bucket has no lifecycle configuration, handle the exception
-        bucket_lifecycle_configs[bucket_name] = "No lifecycle configuration"
+# Iterate through each bucket and list subfolders
+for bucket in buckets:
+    bucket_name = bucket['Name']
+    
+    # List objects in the bucket (including subfolders)
+    objects = s3.list_objects_v2(Bucket=bucket_name)
+    
+    # List common prefixes (subfolders)
+    for common_prefix in objects.get('CommonPrefixes', []):
+        subfolder = common_prefix['Prefix']
+        subfolders.append(f"Bucket: {bucket_name}, Subfolder: {subfolder}")
 
-# Define the output file name
-output_file = 's3_bucket_lifecycle_configs.json'
+# Write the list of subfolder names to a file
+with open('subfolders.txt', 'w') as file:
+    for subfolder in subfolders:
+        file.write(subfolder + '\n')
 
-# Write the bucket lifecycle configurations to a JSON file
-with open(output_file, 'w') as json_file:
-    json.dump(bucket_lifecycle_configs, json_file, indent=4)
-
-print(f"Lifecycle configurations for S3 buckets have been written to {output_file}")
+print(f"Subfolder names from all buckets have been written to subfolders.txt")
