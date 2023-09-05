@@ -1,28 +1,43 @@
 import boto3
+import csv
 
 # Initialize the S3 client
 s3 = boto3.client('s3')
 
-# Name of your S3 bucket
-bucket_name = 'your-bucket-name'
+# Output CSV file
+output_csv = 's3_lifecycle_policies.csv'
 
-try:
-    # Get the lifecycle configuration for the bucket
-    response = s3.get_bucket_lifecycle_configuration(Bucket=bucket_name)
+# Write CSV header
+csv_header = ["Bucket Name", "Rule Name", "Status", "Prefix", "Expiration (Days)", "Transition (Days)", "Storage Class"]
 
-    # Check if a lifecycle policy exists for the bucket
-    if 'Rules' in response:
-        print("Lifecycle Policy:")
-        for rule in response['Rules']:
-            print(f"Rule ID: {rule.get('ID', 'N/A')}")
-            print(f"Status: {rule.get('Status', 'N/A')}")
-            print(f"Prefix: {rule.get('Prefix', 'N/A')}")
-            print(f"Expiration (Days): {rule.get('Expiration', {}).get('Days', 'N/A')}")
-            print(f"Transition (Days): {rule.get('Transitions', [])[0].get('Days', 'N/A') if rule.get('Transitions') else 'N/A'}")
-            print()
+with open(output_csv, 'w', newline='') as csvfile:
+    csv_writer = csv.writer(csvfile)
+    csv_writer.writerow(csv_header)
 
-    else:
-        print("No lifecycle policy found for the bucket.")
+    # List all S3 buckets
+    buckets = s3.list_buckets()['Buckets']
 
-except Exception as e:
-    print(f"Error: {str(e)}")
+    for bucket in buckets:
+        bucket_name = bucket['Name']
+
+        try:
+            # Get the lifecycle configuration for the bucket
+            response = s3.get_bucket_lifecycle_configuration(Bucket=bucket_name)
+
+            # Extract and format the lifecycle policy information
+            for rule in response.get('Rules', []):
+                rule_name = rule.get('ID', 'N/A')
+                status = rule.get('Status', 'N/A')
+                prefix = rule.get('Prefix', 'N/A')
+                expiration_days = rule.get('Expiration', {}).get('Days', 'N/A')
+                transition_days = rule.get('Transitions', [{}])[0].get('Days', 'N/A')
+                storage_class = rule.get('Transitions', [{}])[0].get('StorageClass', 'N/A')
+
+                # Write the information to the CSV file
+                csv_writer.writerow([bucket_name, rule_name, status, prefix, expiration_days, transition_days, storage_class])
+
+        except Exception as e:
+            # Handle any errors that may occur while retrieving the lifecycle policy
+            print(f"Error for bucket '{bucket_name}': {str(e)}")
+
+print(f"Lifecycle policy information has been written to {output_csv}")
