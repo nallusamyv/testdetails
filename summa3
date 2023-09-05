@@ -8,36 +8,55 @@ s3 = boto3.client('s3')
 output_csv = 's3_lifecycle_policies.csv'
 
 # Write CSV header
-csv_header = ["Bucket Name", "Rule Name", "Status", "Prefix", "Expiration (Days)", "Transition (Days)", "Storage Class"]
+csv_header = ["Bucket Name", "Rule Name", "Rule Type", "Status", "Prefix", "Expiration (Days)", "Transition (Days)", "Storage Class", "Scope"]
 
+# Initialize an empty list to store the data
+data = []
+
+# List all S3 buckets
+buckets = s3.list_buckets()['Buckets']
+
+for bucket in buckets:
+    bucket_name = bucket['Name']
+
+    try:
+        # Get the lifecycle configuration for the bucket
+        response = s3.get_bucket_lifecycle_configuration(Bucket=bucket_name)
+
+        # Extract and format the lifecycle policy information
+        for rule in response.get('Rules', []):
+            rule_name = rule.get('ID', 'N/A')
+            status = rule.get('Status', 'N/A')
+            prefix = rule.get('Prefix', 'N/A')
+            expiration_days = rule.get('Expiration', {}).get('Days', 'N/A')
+            transition_days = rule.get('Transitions', [{}])[0].get('Days', 'N/A')
+            storage_class = rule.get('Transitions', [{}])[0].get('StorageClass', 'N/A')
+            
+            # Determine the rule type
+            rule_type = 'Standard'  # Default to a standard rule
+            if 'AbortIncompleteMultipartUpload' in rule:
+                rule_type = 'AbortIncompleteMultipartUpload'
+            elif 'NoncurrentVersionExpiration' in rule:
+                rule_type = 'NoncurrentVersionExpiration'
+            elif 'Expiration' in rule:
+                rule_type = 'Expiration'
+            
+            # Extract the rule scope (filter)
+            scope_filter = 'N/A'
+            if 'Filter' in rule and 'Prefix' in rule['Filter']:
+                scope_filter = rule['Filter']['Prefix']
+            
+            # Append the information to the data list
+            data.append([bucket_name, rule_name, rule_type, status, prefix, expiration_days, transition_days, storage_class, scope_filter])
+
+    except Exception as e:
+        # Handle any errors that may occur while retrieving the lifecycle policy
+        print(f"Error for bucket '{bucket_name}': {str(e)}")
+
+# Write the data to the CSV file
 with open(output_csv, 'w', newline='') as csvfile:
     csv_writer = csv.writer(csvfile)
     csv_writer.writerow(csv_header)
-
-    # List all S3 buckets
-    buckets = s3.list_buckets()['Buckets']
-
-    for bucket in buckets:
-        bucket_name = bucket['Name']
-
-        try:
-            # Get the lifecycle configuration for the bucket
-            response = s3.get_bucket_lifecycle_configuration(Bucket=bucket_name)
-
-            # Extract and format the lifecycle policy information
-            for rule in response.get('Rules', []):
-                rule_name = rule.get('ID', 'N/A')
-                status = rule.get('Status', 'N/A')
-                prefix = rule.get('Prefix', 'N/A')
-                expiration_days = rule.get('Expiration', {}).get('Days', 'N/A')
-                transition_days = rule.get('Transitions', [{}])[0].get('Days', 'N/A')
-                storage_class = rule.get('Transitions', [{}])[0].get('StorageClass', 'N/A')
-
-                # Write the information to the CSV file
-                csv_writer.writerow([bucket_name, rule_name, status, prefix, expiration_days, transition_days, storage_class])
-
-        except Exception as e:
-            # Handle any errors that may occur while retrieving the lifecycle policy
-            print(f"Error for bucket '{bucket_name}': {str(e)}")
+    csv_writer.writerows(data)
 
 print(f"Lifecycle policy information has been written to {output_csv}")
