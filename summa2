@@ -1,32 +1,53 @@
-import boto3
+import json
+import csv
 
-# Initialize the S3 client
-s3_client = boto3.client('s3')
+# Load the JSON data (replace 'data_lake_permissions.json' with your JSON file path)
+with open('data_lake_permissions.json', 'r') as json_file:
+    data = json.load(json_file)
 
-def list_all_subfolders(bucket_name, prefix='', delimiter='/'):
-    subfolder_paths = []
+# Extracted data list
+extracted_data = []
 
-    # List objects in the bucket, with the specified prefix (subfolder)
-    objects_response = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=prefix, Delimiter=delimiter)
+# Extract information from JSON
+for permission in data.get("PrincipalResourcePermissions", []):
+    principal_identifier = permission.get("Principal", {}).get("DataLakePrincipalIdentifier", "")
+    
+    # Extract fields from the Resource JSON
+    resource = permission.get("Resource", {})
+    resource_catalog_id = resource.get("Catalog", {}).get("CatalogId", "")
+    resource_database_name = resource.get("Database", {}).get("Name", "")
+    resource_table_name = resource.get("Table", {}).get("Name", "")
+    resource_lf_tag_policy_arn = resource.get("LF Tag Policy", {}).get("ResourceArn", "")
 
-    # Iterate through common prefixes (subfolders)
-    for prefix in objects_response.get('CommonPrefixes', []):
-        subfolder_name = prefix['Prefix']
-        subfolder_paths.append(subfolder_name)
-        subfolder_paths.extend(list_all_subfolders(bucket_name, prefix=subfolder_name))  # Recurse into subfolders
+    permissions = ", ".join(permission.get("Permissions", []))
+    grantable = permission.get("Grantable", False)
 
-    return subfolder_paths
+    # Create a dictionary with extracted values
+    extracted_data.append({
+        "PrincipalIdentifier": principal_identifier,
+        "ResourceCatalogId": resource_catalog_id,
+        "ResourceDatabaseName": resource_database_name,
+        "ResourceTableName": resource_table_name,
+        "ResourceLFTagPolicyArn": resource_lf_tag_policy_arn,
+        "Permissions": permissions,
+        "Grantable": grantable,
+    })
 
-try:
-    # Specify the bucket name
-    bucket_name = 'your-bucket-name'
+# Define the CSV file path
+csv_file_path = 'lakeformation_permissions_with_resource.csv'
 
-    # List all subfolders recursively
-    subfolder_paths = list_all_subfolders(bucket_name)
+# Write the extracted data to a CSV file
+with open(csv_file_path, 'w', newline='') as csv_file:
+    fieldnames = [
+        "PrincipalIdentifier", "ResourceCatalogId", "ResourceDatabaseName",
+        "ResourceTableName", "ResourceLFTagPolicyArn", "Permissions", "Grantable"
+    ]
+    csv_writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
 
-    # Print the subfolder paths
-    for path in subfolder_paths:
-        print("Subfolder:", path)
+    # Write the header row
+    csv_writer.writeheader()
 
-except Exception as e:
-    print("Error:", e)
+    # Write the extracted data rows
+    csv_writer.writerows(extracted_data)
+
+print(f"Data extracted and written to {csv_file_path}")
