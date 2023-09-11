@@ -1,56 +1,40 @@
 import boto3
 import csv
 
-# Initialize the Lake Formation client
+# Initialize Boto3 Lake Formation client
 lf_client = boto3.client('lakeformation')
 
-# Specify the name of the Lake Formation catalog
-catalog_name = 'my-catalog'
+# Specify CSV file path
+csv_file_path = 'datalake_permissions.csv'
 
-# Specify the output CSV file path
-output_csv_file = 'lake_formation_permissions.csv'
+# Write permissions to CSV file
+with open(csv_file_path, 'w', newline='') as csv_file:
+    csv_writer = csv.writer(csv_file)
 
-try:
-    # Get the list of databases in the catalog
-    database_response = lf_client.list_databases(CatalogId='account-id', CatalogName=catalog_name)
+    # Write header row
+    csv_writer.writerow(['CatalogId', 'Principal', 'PrincipalType', 'Resource', 'ResourceType', 'Permission', 'GrantOption', 'Grantable'])
 
-    # Prepare the CSV file for writing
-    with open(output_csv_file, 'w', newline='') as csv_file:
-        fieldnames = ['Principal', 'Principal Type', 'Principal ARN', 'Database', 'Table', 'Permissions', 'Grantable']
-        csv_writer = csv.DictWriter(csv_file, fieldnames=fieldnames, delimiter='|')
-        csv_writer.writeheader()
+    # List data lake permissions
+    response = lf_client.list_permissions(
+        CatalogId='your-catalog-id',  # Replace with your AWS account ID or leave as-is for the default account
+        Principal={'DataLakePrincipalIdentifier': 'string'},
+        ResourceType='CATALOG'|'DATABASE'|'TABLE'|'DATA_LOCATION'|'LF_TAG'|'LF_TAG_POLICY'|'LF_TAG_POLICY_DATABASE'|'LF_TAG_POLICY_TABLE',
+        Resource={'Catalog': {}},  # Example resource, you can adjust as needed
+        MaxResults=100  # Adjust as needed
+    )
 
-        # Iterate through the list of databases
-        for database in database_response['DatabaseList']:
-            database_name = database['Name']
+    # Write permission details to CSV
+    for permission in response.get('PrincipalResourcePermissions', []):
+        catalog_id = permission.get('CatalogId', '')
+        principal = permission.get('Principal').get('DataLakePrincipalIdentifier', '')
+        principal_type = permission.get('Principal').get('PrincipalType', '')
+        resource = permission.get('Resource', '')
+        resource_type = permission.get('ResourceType', '')
+        permission_type = permission.get('Permissions', '')
+        grant_option = permission.get('GrantOption', '')
+        grantable = permission.get('Grantable', '')
 
-            # Get the list of tables in the database
-            table_response = lf_client.list_tables(CatalogId='account-id', DatabaseName=database_name)
+        # Write the data to CSV
+        csv_writer.writerow([catalog_id, principal, principal_type, resource, resource_type, permission_type, grant_option, grantable])
 
-            for table in table_response['TableList']:
-                table_name = table['Name']
-
-                # Get the permissions for the table
-                permissions_response = lf_client.list_permissions(CatalogId='account-id', DatabaseName=database_name, TableWithColumns={'DatabaseName': database_name, 'Name': table_name})
-
-                for permission in permissions_response['PrincipalResourcePermissions']:
-                    principal = permission['Principal']['DataLakePrincipalIdentifier']
-                    principal_type = permission['Principal']['Type']
-                    principal_arn = permission['Principal']['Identifier']
-                    permissions = ', '.join(permission['Permissions'])
-                    grantable = permission['PermissionsWithGrantOption']
-
-                    csv_writer.writerow({
-                        'Principal': principal,
-                        'Principal Type': principal_type,
-                        'Principal ARN': principal_arn,
-                        'Database': database_name,
-                        'Table': table_name,
-                        'Permissions': permissions,
-                        'Grantable': grantable
-                    })
-
-    print("CSV output written to", output_csv_file)
-
-except Exception as e:
-    print("Error:", e)
+print(f"Data lake permissions extracted and written to {csv_file_path}")
