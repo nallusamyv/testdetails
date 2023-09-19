@@ -1,1 +1,15 @@
-According to our intended approach, we're looking to utilize object tags in Amazon S3 (where the model serves as the key and the model ID as the value) for accessing specific S3 objects, thereby reaching the desired model. This approach is well-suited for fulfilling CADS requests from different AWS Accounts. However, we anticipate a potential need to create a storage integration in Snowflake in the future, should Snowflake require access to these external tables or utilize the object tags. Currently, CADS is instrumental in setting up the Snowflake storage integration. I can provide a sample request if needed. Notably, while Snowflake's documentation indicates support for specifying S3 buckets and prefixes in storage integration, it does not yet support configuring it based on object tags. 
+Fine-Grain Access Control:
+Fine-grain access control involves granting precise permissions and access rights at a granular level within the database. Each user or role may have very specific privileges, allowing or restricting actions down to a fine level of detail.
+
+Example - Fine-Grain Access Control:
+
+User A can only read data from a specific table.
+User B can insert, update, and delete records in a particular column of a table.
+User C has access to a subset of rows within a table.
+Coarse-Grain Access Control:
+Coarse-grain access control involves providing more generalized access permissions. Users or roles might have broader privileges, covering larger portions of the database or even the entire database.
+
+Example - Coarse-Grain Access Control:
+
+A group of users has read and write access to an entire database.
+All authenticated users can read data from a specific set of tables.
