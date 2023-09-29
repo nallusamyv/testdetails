@@ -1,53 +1,20 @@
-import json
-import csv
+Problem Statement:
 
-# Load the JSON data (replace 'data_lake_permissions.json' with your JSON file path)
-with open('data_lake_permissions.json', 'r') as json_file:
-    data = json.load(json_file)
+JPMC adheres to the Datamesh model, where the producer possesses the data and consumption accounts (whether Omni or non-Omni) are granted access to the data in the producer's bucket through S3 or Lakeformation. Proper access control is vital for a multitude of reasons that are fundamental to maintaining security, privacy, compliance, and efficient operations in various systems and environments.  AWS access control to be defined, ensures that only authorized users/aws accounts have access to specific resources. This significantly reduces the risk of unauthorized access, data breaches, and malicious activities. Access control helps maintain the confidentiality of sensitive data by restricting access to authorized individuals or systems.
 
-# Extracted data list
-extracted_data = []
+What is the solution today?
 
-# Extract information from JSON
-for permission in data.get("PrincipalResourcePermissions", []):
-    principal_identifier = permission.get("Principal", {}).get("DataLakePrincipalIdentifier", "")
-    
-    # Extract fields from the Resource JSON
-    resource = permission.get("Resource", {})
-    resource_catalog_id = resource.get("Catalog", {}).get("CatalogId", "")
-    resource_database_name = resource.get("Database", {}).get("Name", "")
-    resource_table_name = resource.get("Table", {}).get("Name", "")
-    resource_lf_tag_policy_arn = resource.get("LF Tag Policy", {}).get("ResourceArn", "")
+The AWS Access control for Omni, Non-Omni accounts for S3, Athena and Redshift are outlined as below:
 
-    permissions = ", ".join(permission.get("Permissions", []))
-    grantable = permission.get("Grantable", False)
+Omni consumption accounts directly access S3 files through an S3 access bucket using prefixes or object tags, while non-Omni consumption accounts access S3 bucket contents via Lakeformation. Additionally, access for user consumption is established in the consumption account, and appropriate access controls are established to manage access between producers,consumers, and users. The existing access control configuration for S3, Athena, and Redshift is as follows: Omni Consumption accounts access S3 through CADS requests using prefixes.Non-Omni Consumption(Athena/Redshift Access) accounts access S3 data through Lake Formation via federated Lake Formation account through data catalog resource name(i.e Access give in the database/table level).Different IAM roles are established for Athena or different external schemas are created to control and restrict user access appropriately.
 
-    # Create a dictionary with extracted values
-    extracted_data.append({
-        "PrincipalIdentifier": principal_identifier,
-        "ResourceCatalogId": resource_catalog_id,
-        "ResourceDatabaseName": resource_database_name,
-        "ResourceTableName": resource_table_name,
-        "ResourceLFTagPolicyArn": resource_lf_tag_policy_arn,
-        "Permissions": permissions,
-        "Grantable": grantable,
-    })
 
-# Define the CSV file path
-csv_file_path = 'lakeformation_permissions_with_resource.csv'
+Proposed Solution:
 
-# Write the extracted data to a CSV file
-with open(csv_file_path, 'w', newline='') as csv_file:
-    fieldnames = [
-        "PrincipalIdentifier", "ResourceCatalogId", "ResourceDatabaseName",
-        "ResourceTableName", "ResourceLFTagPolicyArn", "Permissions", "Grantable"
-    ]
-    csv_writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+To enhance the current access control process using S3 Object tags, Lake Formation (LF) tags, and Immuta for proper access control, incorporate the following features and options:
 
-    # Write the header row
-    csv_writer.writeheader()
+S3: Implement S3 Access Points based on Tags or Prefixes: Utilize S3 Access Points with appropriate tags or prefixes to restrict access based on account types for Omni Accounts. Configure Access Points for Non-Omniaccounts, each with its set of tags or prefixes, allowing granular control over access to S3 data.
+Athena: Establish a streamlined integration between Lake Formation access policies and IAM roles for Non-Omni. Define IAM roles associated with specific permissions and attach them to Lake Formation resources based on LF tags or the resource name.
+Redshift: Utilize Immuta to enforce dynamic data masking and additional access control policies for sensitive data. Immuta can dynamically mask or restrict access to specific data fields based on the user's role, improving data privacy and security.
 
-    # Write the extracted data rows
-    csv_writer.writerows(extracted_data)
-
-print(f"Data extracted and written to {csv_file_path}")
+Please note: Snowflake, Databricks are not included in the above scope.
