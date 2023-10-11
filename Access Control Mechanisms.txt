@@ -1,43 +1,20 @@
+Provision Redshift Spectrum Consumption Pattern:
 
-Agenda:
+Objective: Provision consumption pattern for Redshift Spectrum assuming access granted at the database level by the producer.
+Definition of Done (DoD): Successful provisioning of Redshift Spectrum, and successful data access using SQLquirrel.
+IAM and Application Role Creation for Immuta Registration:
 
-Sharing Team IDs for Use Cases Completion
-Immata's Fine-Grained Access Control for Redshift
-Progress on Redshift Registration with Immuta
-Access Control Options in Producer-Lakeformation-Consumer Setup
-Next Steps and Action Items
-Minutes:
+Objective: Create IAM and application roles for registration in Immuta, enabling access for JEMS and JADEINT.
+DoD: All necessary roles created, and communication initiated with the Immuta team for registration. Corresponding RSAM tickets to be created for access.
+Analysis of Immuta Capabilities in Subscription and Data Policy:
 
-Sharing Team IDs for Use Cases:
-Sur requested tech leads to provide their team's IDs for completing collected use cases. Additionally, teams were encouraged to share any new use cases.
+Objective: Analyze Immuta capabilities concerning subscription and data policy enforcement.
+DoD: Understanding of Immuta policies and their enforcement mechanisms.
+Creation of Data Sources, Tag Creation, Mapping, and Access Testing with Immuta:
 
-Immata's Fine-Grained Access Control for Redshift:
-Sur provided an overview of how Immuta enforces fine-grained access control for Redshift. The discussion included:
+Objective: Create data sources, generate tags, perform tag mapping, and test user access scenarios using Immuta.
+DoD: Successful policy creation in Immuta, visibility of policies in Redshift, and successful user access.
+Documentation of POC Progress and Scenarios:
 
-Immuta's integration with Redshift and its role in access control.
-Prerequisites for integrating Immuta with Redshift.
-Explanation of how subscriptions and data policies enforce access control for users.
-Progress on Redshift Registration with Immuta:
-Sur shared the current progress of the Proof of Concept (POC), highlighting that the registration of Redshift with Immuta is in progress.
-
-Access Control Options in Producer-Lakeformation-Consumer Setup:
-Sur discussed three access control options in the Producer-Lakeformation-Consumer setup, emphasizing the advantages and disadvantages of each:
-
-Producer - Lakeformation - Consumer (Redshift) - Immuta (fine-grained access control)
-Producer - CAS - Consumer (Redshift) - Immuta (fine-grained access control)
-Producer - CAS - Consumer (Glue-Redshift) - Immuta (fine-grained access control)
-Next Steps and Action Items:
-
-The meeting concluded with the plan to explain all of Immuta's features with examples once the POC is completed.
-Action items identified for the next steps:
-Tech leads to share SIDs for the Github Copilot POC (completed).
-Details of the POC to be shared in the next tech forum.
-The meeting concluded at [Insert End Time]. The next meeting is scheduled for [Insert Date and Time].
-
-Submitted by: [Insert Name/Designation]
-Approved by: [Insert Name/Designation]
-
-
-
-
-
+Objective: Document the progress of the Proof of Concept (POC) with detailed scenarios.
+DoD: Well-documented Confluence page referencing POC progress. Create corresponding JIRA stories with the provided detail
