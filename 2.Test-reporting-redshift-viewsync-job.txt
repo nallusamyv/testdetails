@@ -1,0 +1,215 @@
+"""
+Script name     : gbs-dev-reporting-gdh-redshift-viewsync-job.py
+Summary         : Script to extract the view definition from Athena and create the same in Redshift GDH DB
+"""
+
+import sys
+import boto3
+import awswrangler as wr
+import pandas as pd
+import re
+import redshift_connector
+import logging
+from awsglue.utils import getResolvedOptions
+import datetime
+
+args = getResolvedOptions(sys.argv, ["output_results_location", "kms_key", "SOURCE_SCHEMAS","MODE", "CLUSTER_ID", "RS_CLUSTER_HOST", "RS_CLUSTER_PORT", "RS_DATABASE", "RS_USER" ])
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+output_location = args["output_results_location"]
+kms_key = args["kms_key"]
+source_schemas = args["SOURCE_SCHEMAS"]
+mode = args["MODE"]
+rs_cluster_id = args["CLUSTER_ID"]
+rs_cluster_host = args["RS_CLUSTER_HOST"]
+rs_cluster_port = args["RS_CLUSTER_PORT"]
+rs_database = args["RS_DATABASE"]
+rs_user = args["RS_USER"]
+
+
+region_name = "us-east-1"
+encryption = 'SSE_KMS'
+
+
+logger.info(f"output_location={output_location}, kms_key={kms_key}, source_schemas={source_schemas}, mode={mode}")
+
+boto3.setup_default_session(region_name=region_name)
+athena_client = boto3.client('athena')
+redshift_client = boto3.client('redshift')
+
+def initialize_redshift_connection():
+    cluster_creds = redshift_client.get_cluster_credentials(DbUser=rs_user, DbName=rs_database, ClusterIdentifier=rs_cluster_id, AutoCreate=False)
+
+    return redshift_connector.connect(
+        host=rs_cluster_host,
+        database=rs_database,
+        port=int(rs_cluster_port),
+        user=cluster_creds['DbUser'],
+        password=cluster_creds['DbPassword']
+      )
+
+def execute_query_athena(sql, source_schema):
+    query_execn_details = wr.athena.start_query_execution(sql=sql, database=source_schema, encryption=encryption, kms_key=kms_key, s3_output=output_location, wait=True)
+    return athena_client.get_query_results(QueryExecutionId=query_execn_details['QueryExecutionId'])
+    
+def get_viewlist_from_response(response): 
+    view_list = []
+    for res in response['ResultSet']['Rows']:         
+         for field in res['Data']:            
+            try:
+                view_list.append(list(field.values())[0]) 
+            except:
+                view_list.append(list(' '))
+ 
+    return view_list
+
+def convert_to_spectrum(view_ddl,source_schema,target_schema):
+    #logger.info(view_ddl)
+    #Replace the schema name within "CREATE VIEW xxxxx"
+    matched_text = re.search(f'CREATE VIEW {source_schema}', view_ddl,re.I)
+    if matched_text != None:
+        view_ddl = view_ddl.replace(matched_text.group(), f"CREATE OR REPLACE VIEW {target_schema}")
+
+    #Using Regex to find all lines that has a word ending with _cvw¶
+    matched_list = re.findall(r'\S+_cvw', view_ddl,re.I)
+    for item in matched_list:            
+        compiled = re.compile(re.escape('GBS_REPORTING_'), re.IGNORECASE)
+        updated_item = compiled.sub('', item)    
+        view_ddl = view_ddl.replace(item, updated_item)
+
+    #Using Regex to find all lines that has a word ending with _vw¶
+    matched_list = re.findall(r'\S+_vw', view_ddl,re.I)
+    for item in matched_list:            
+        compiled = re.compile(re.escape('GBS_REPORTING_'), re.IGNORECASE)
+        updated_item = compiled.sub('', item)    
+        view_ddl = view_ddl.replace(item, updated_item)
+        
+    #Using Regex to replace "greatest"¶          
+    re_greatest= re.compile(re.escape('"greatest"'), re.IGNORECASE)
+    view_ddl = re_greatest.sub('greatest', view_ddl)               
+    
+    return view_ddl
+
+def is_view_in_skiplist(skiplist,schema_name, view_name):
+    expression = f"schema_name == '{schema_name}' and view_name == '{view_name}'"
+    df= skiplist.query(expression)
+    return df.count().any()    
+    
+def initiate_view_sync_process():
+    logger.info('INITIATING SYNC PROCESS')
+    
+    conn = initialize_redshift_connection()
+    
+    source_schema_list = source_schemas.split(',')
+    
+    current_time = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    file_name = f"{output_location}/athenatoredshiftsync/sync_results/redshift_viewsync_{current_time}.xlsx"
+    logger.info(file_name)
+
+    #Extract the list of views to be skipped from redshift table
+    with conn.cursor() as cursor:
+        cursor.execute("""select * from gdh_view_sync.view_sync_ctrl""")
+        skip_list: pd.DataFrame = cursor.fetch_dataframe() 
+    
+    with pd.ExcelWriter(file_name) as writer:
+        for source_schema in source_schema_list:
+            #remove leading and trailing whitespace if any
+            source_schema = source_schema.strip()
+            #derive the target schmea from source schema
+            target_schema = source_schema.replace('gbs_reporting_','')
+            
+            logger.info(f"BEGIN - SYNC FROM SCHEMA - {source_schema}")
+            #Get the list of view from the source_schema using athena
+            view_list_response = execute_query_athena('SHOW VIEWS',source_schema)
+            view_list = get_viewlist_from_response(view_list_response)
+            
+            view_creation_result = []
+            
+            with conn.cursor() as cursor:
+                for view in view_list:
+                    try: 
+                        #skip the view creation if it is in skiplist
+                        if is_view_in_skiplist(skip_list,target_schema,view):
+                            logger.info(f'SKIPPING VIEW {view}')
+                            view_creation_result.append((view,'SKIPPED',''))
+                        else:
+                            logger.info(f'BEGIN - CREATING VIEW {view}')
+                            view_ddl_response = execute_query_athena(f'SHOW CREATE VIEW {view}',source_schema)
+                            athena_view_ddl ='\n'.join([*get_viewlist_from_response(view_ddl_response),'WITH NO SCHEMA BINDING'])
+        
+                            spectrum_view_ddl = convert_to_spectrum(athena_view_ddl,source_schema,target_schema)
+                            cursor.execute(spectrum_view_ddl)  
+                            conn.commit()
+                            view_creation_result.append((view,'SUCCESS',''))
+                            logger.info(f'END - CREATING VIEW {view}')
+                    except Exception as e:
+                        logger.info(e)
+                        conn.rollback()
+                        view_creation_result.append((view,'FAILED',e))
+                        logger.info(f'VIEW_CREATION_ERROR - ERROR CREATING VIEW: {view} SCHEMA: {target_schema}')
+                        
+            if len(view_creation_result) > 0:
+                sheet_name = target_schema
+                #Excel worksheet name cannot be more than 31 chars
+                if len(sheet_name) > 31:
+                    sheet_name = sheet_name[0:31]
+                df = pd.DataFrame(view_creation_result, columns =['VIEW_NAME','STATUS','ERROR'])
+                df.to_excel(writer, sheet_name=sheet_name, index = False)
+            
+            logger.info(f"END - SYNC FROM SCHEMA - {source_schema}")
+    return
+
+def validate_view(schema):
+    view_validation_result = []
+    conn = initialize_redshift_connection()
+    with conn.cursor() as cursor:
+        cursor.execute(f"select table_name as view_name from information_schema.views where table_schema = '{schema}'")
+        result: pd.DataFrame = cursor.fetch_dataframe()
+        
+    if result is not None:
+        with conn.cursor() as cursor:
+            for index, row in result.iterrows():
+                try:
+                    logger.info(f"Validating {index} - {row['view_name']}")
+                    response = cursor.execute(f"select count(1) from {schema}.{row['view_name']}")
+                    record_count = response.fetchone()[0]
+                    view_validation_result.append((row['view_name'],record_count,''))
+                    logger.info(f"Validation Successful {index} - {row['view_name']} - {record_count}")
+                except Exception as e:
+                    logger.info(f"Validation Failed - {row['view_name']} - {e}")
+                    view_validation_result.append((row['view_name'],'',e))
+                    conn.rollback()
+    return view_validation_result
+
+def initiate_view_validation_process():
+    current_time = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    schema_list = source_schemas.split(',')
+    file_name = f"{output_location}/athenatoredshiftsync/validation_results/redshift_viewvalidation_{current_time}.xlsx"
+    logger.info(file_name)
+    
+    with pd.ExcelWriter(file_name) as writer:
+        for schema in schema_list:
+            view_schema = schema.replace('gbs_reporting_','')
+            result = validate_view(view_schema)
+            if len(result) > 0:
+                sheet_name = view_schema
+                #Excel worksheet name cannot be more than 31 chars
+                if len(sheet_name) > 31:
+                    sheet_name = sheet_name[0:31]
+                df = pd.DataFrame(result, columns =['VIEW_NAME','RECORD_COUNT','ERROR'])
+                df.to_excel(writer, sheet_name=sheet_name, index = False)
+    return
+
+def main():
+    if mode.lower() == "sync":
+        initiate_view_sync_process()
+    elif mode.lower() == "validate":
+        initiate_view_validation_process()
+    else:
+        raise Exception("Invalid MODE, should be SYNC or VALIDATE")
+    return
+
+if __name__ == '__main__':
+    main()
