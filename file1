@@ -1,0 +1,9 @@
+Worked on securing approval for ABC and prepared a PTB document for DEF, facilitating a review with the architecture team.
+
+Led a Proof of Concept (POC) to establish access to the shared producer database by creating resource links (not for individual tables). Shared the approach with the UBF and Bang Team, providing necessary guidance.
+
+Organized and presented at a tech forum, explaining the integration of Redshift and Immuta to all forum members. Detailed the IAM roles that need to be established and described how the integration functions. Please find the related link.
+
+Established an Immuta instance and JEMS authoring environment within the FRD in Redshift, which will be utilized if we proceed with Immuta implementation.
+
+Currently working on the Immuta-Redshift integration POC. Recently obtained access approval for Immuta and JEMS, and will be actively engaged in this task starting tod
