@@ -10,4 +10,17 @@ Additionally, I am dedicated to continuously optimizing our data architecture an
 
 I took charge of coordinating the GitHub Copilot license and am currently actively engaged in the Proof of Concept (POC) related to this endeavor. This project holds significant importance as it contributes to the effective utilization of GitHub Copilot within our development processes while ensuring proper licensing compliance.
 
+I took on the responsibility of designing the migration of the DIS-RKS architecture from on-premises to the cloud. In this process, I crafted the architecture with a "pilot light" approach, taking into account the Recovery Point Objective (RPO) to ensure data integrity and continuity. Additionally, I led the transition by replacing the existing GKP Kubernetes setup with a more lightweight and serverless execution using ECS Fargate. To enhance disaster recovery capabilities, I proposed the implementation of Aurora Global Database to achieve region-wide redundancy and high availability.
+
+First, I've been leading a Proof of Concept (POC) to establish centralized access control for cloud platforms like AWS, Snowflake, and Databricks. This project is crucial in enhancing security and access management, ensuring we meet our clients' requirements for robust governance.
+
+Additionally, I took the lead in designing the AWS Solution architecture for the DIS-RCS application. I successfully obtained approval for account provisioning and recommended ECS Fargate as the ideal solution. This not only streamlines our operations but also ensures we deliver efficient and customized solutions to meet our clients' specific needs.
+
+Furthermore, I've been collaborating with the URDS team to architect a producer/consumer setup that caters to their unique requirements. By actively engaging with the team, I'm committed to delivering a solution that precisely aligns with their needs.
+
+First, I've been leading a Proof of Concept (POC) to establish centralized access control for cloud platforms like AWS, Snowflake, and Databricks. This project is crucial in enhancing security and access management, ensuring we meet our clients' requirements for robust governance.
+
+Additionally, I took the lead in designing the AWS Solution architecture for the DIS-RCS application. I successfully obtained approval for account provisioning and recommended ECS Fargate as the ideal solution. This not only streamlines our operations but also ensures we deliver efficient and customized solutions to meet our clients' specific needs.
+
+Furthermore, I've been collaborating with the URDS team to architect a producer/consumer setup that caters to their unique requirements. By actively engaging with the team, I'm committed to delivering a solution that precisely aligns with their needs.
 
