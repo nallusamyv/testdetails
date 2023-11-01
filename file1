@@ -1,9 +1,62 @@
-Worked on securing approval for ABC and prepared a PTB document for DEF, facilitating a review with the architecture team.
+import pyarrow as pa
+import pyarrow.parquet as pq
+import pandas as pd
+from faker import Faker
+import random
+import datetime
 
-Led a Proof of Concept (POC) to establish access to the shared producer database by creating resource links (not for individual tables). Shared the approach with the UBF and Bang Team, providing necessary guidance.
+# Create a Faker generator for generating random data
+fake = Faker()
 
-Organized and presented at a tech forum, explaining the integration of Redshift and Immuta to all forum members. Detailed the IAM roles that need to be established and described how the integration functions. Please find the related link.
+# Define the schema
+schema = pa.schema([
+    ('Col1', pa.int64()),
+    ('Col2_Firstname', pa.string()),
+    ('Col3_Lastname', pa.string()),
+    ('Col4_DOB', pa.date32()),
+    ('Col5_state', pa.string()),
+    ('Col6_city', pa.string()),
+    ('Col7_zip', pa.string()),
+    ('Col8_create_dt', pa.date32()),
+    ('Col9_business_date', pa.date32())
+])
 
-Established an Immuta instance and JEMS authoring environment within the FRD in Redshift, which will be utilized if we proceed with Immuta implementation.
+# Function to generate random records
+def generate_random_records(num_records):
+    records = []
+    for _ in range(num_records):
+        record = (
+            random.randint(1, 1000),           # Col1 (numeric)
+            fake.first_name(),                 # Col2_Firstname (VARCHAR)
+            fake.last_name(),                  # Col3_Lastname (VARCHAR)
+            fake.date_of_birth(minimum_age=18, maximum_age=65),  # Col4_DOB (date)
+            fake.state_abbr(),                # Col5_state (VARCHAR)
+            fake.city(),                      # Col6_city (VARCHAR)
+            fake.zipcode(),                   # Col7_zip (VARCHAR)
+            fake.date_between(start_date='-1y', end_date='today'),  # Col8_create_dt (date)
+            fake.date_between(start_date='-1y', end_date='today')   # Col9_business_date (date)
+        )
+        records.append(record)
+    return records
 
-Currently working on the Immuta-Redshift integration POC. Recently obtained access approval for Immuta and JEMS, and will be actively engaged in this task starting tod
+# Specify the output directory where you want to write the Parquet files
+output_dir = '/path/to/output/directory'
+
+# Generate random records and create a PyArrow Table
+num_records_per_partition = 10000000
+num_partitions = 10  # You'll have 10 partitions with 10 million records each
+
+for i in range(num_partitions):
+    records = generate_random_records(num_records_per_partition)
+    df = pd.DataFrame(records, columns=schema.names)
+    table = pa.Table.from_pandas(df, schema=schema)
+
+    # Assign a business_date to each record based on the partition
+    business_date = datetime.date.today() - datetime.timedelta(days=i)
+    df['Col9_business_date'] = business_date
+    table = pa.Table.from_pandas(df, schema=schema)
+
+    # Write the data to Parquet files with partitioning by 'Col9_business_date'
+    pq.write_to_dataset(table, root_path=output_dir, partition_cols=['Col9_business_date'], flavor='arrow')
+
+# The data is now written to Parquet files in the specified directory with 'Col9_business_date' as the partition key.
