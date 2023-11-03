@@ -1,27 +1,30 @@
-Immuta is a data access and governance platform that provides fine-grained access control, privacy, and compliance features for Redshift, Databricks, and Snowflake, ensuring data security and regulatory compliance. Its benefits include centralizing data access policies, enabling self-service data provisioning, and simplifying compliance management.
 
-Progress and Results: Key Accomplishments
-
-
-Certainly, here are the key points from the provided statement:
-
-2023 Achievements:
-
-Successful completion of the Immuta POC for Redshift, marking a significant milestone in enhancing data governance.
-2024 Roadmap:
-
-Implementation of access control measures.
-Assessments of access control with Databricks and Snowflake.
-Education of product owners, data owners, and the SRE team about the access control model.
-User access implementation using subscription and data policies within the ABC department.
-Focus on addressing access control within the Onfinite AI account.
-Ensuring data availability to the right users.
-Safeguarding highly confidential, confidential, and other important data classifications.
-Upholding data protection, security, and privacy standards.
+pip install delta-io
 
 
-In 2023, we achieved a significant milestone by successfully completing the Immuta POC for Redshift, a crucial step in our journey to enhance data governance. Looking to the upcoming year, we're focusing on assessing the metrics that highlight the benefits, both with and without Immuta. 
-In our ongoing efforts this year, we are in the process of finalizing a centralized access control process pattern, facilitated by Immuta, to manage user access within the Consumer account across various cloud platforms, including AWS Redshift Spectrum, Databricks, and Snowflake. Simultaneously, we are also establishing an access control pattern to oversee access to S3 objects, EMR, and AWS Sagemaker within the Omni AI Account. Additionally, we will identify a data classification process for tables and protection groups within the T/A/D application. This step is crucial for ensuring the appropriate handling and protection of data
+from delta import DeltaTable
 
-The roadmap for 2024 begins with setting up access control measures and concludes with creating a detailed access control system that covers various cloud platforms. Major milestones include completing assessments of access control with Databricks and Snowflake, highlighting the benefits, and educating product owners, data owners, and the SRE team about the access control model. After that, we will implement user access by using subscription and data policies through Immuta within the ABC department. We'll also establish a strong process to manage these access controls, ensuring that everyone on the team follows the same rules.
-Furthermore, our focus extends to addressing the Onfinite AI account, with the creation of a dedicated access control pattern. Our primary objective for the 2024 roadmap is to guarantee data availability to the right users while safeguarding highly confidential, confidential, and other important classifications, ensuring data protection, security, and privacy standards are upheld.
+# Specify the path to the Parquet data
+parquet_path = "path/to/parquet/directory"
+
+# Specify the path to the Delta Lake table
+delta_path = "path/to/delta/table"
+
+# Load the Parquet data and convert it to a Delta table
+delta_table = DeltaTable.convertToDelta(spark, parquet_path, delta_path)
+
+# You can now manage the Delta table using delta_table, e.g., querying, appending data, and more.
+
+
+
+from delta import DeltaTable
+
+# Load the Delta Lake table
+delta_path = "path/to/delta/table"
+delta_table = DeltaTable(spark, delta_path)
+
+# Read the contents into a DataFrame
+delta_df = delta_table.toDF()
+
+# Show the first few rows
+delta_df.show()
