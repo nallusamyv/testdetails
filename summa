@@ -1,5 +1,29 @@
-In 2023, we achieved a significant milestone by successfully completing the Immuta POC for Redshift, a crucial step in our journey to enhance data governance. Looking to the upcoming year, we're focusing on assessing the metrics that highlight the benefits, both with and without Immuta. 
-In our ongoing efforts this year, we are in the process of finalizing a centralized access control process pattern, facilitated by Immuta, to manage user access within the Consumer account across various cloud platforms, including AWS Redshift Spectrum, Databricks, and Snowflake. Simultaneously, we are also establishing an access control pattern to oversee access to S3 objects, EMR, and AWS Sagemaker within the Omni AI Account. Additionally, we will identify a data classification process for tables and protection groups within the T/A/D application. This step is crucial for ensuring the appropriate handling and protection of data
+from pyspark.sql import SparkSession
+from delta import DeltaTable
 
-The roadmap for 2024 begins with setting up access control measures and concludes with creating a detailed access control system that covers various cloud platforms. Major milestones include completing assessments of access control with Databricks and Snowflake, highlighting the benefits, and educating product owners, data owners, and the SRE team about the access control model. After that, we will implement user access by using subscription and data policies through Immuta within the ABC department. We'll also establish a strong process to manage these access controls, ensuring that everyone on the team follows the same rules.
-Furthermore, our focus extends to addressing the Onfinite AI account, with the creation of a dedicated access control pattern. Our primary objective for the 2024 roadmap is to guarantee data availability to the right users while safeguarding highly confidential, confidential, and other important classifications, ensuring data protection, security, and privacy standards are upheld.
+# Create a Spark session
+spark = SparkSession.builder.appName("Convert Parquet to Delta").getOrCreate()
+
+# Read the Parquet file with partitioning
+parquetDF = spark.read.format("parquet").load("path/to/parquet/directory")
+
+# Convert to Delta Lake table and maintain partitioning
+parquetDF.write.format("delta").partitionBy("partition_field").save("path/to/delta/table")
+
+# Manage the Delta table using DeltaTable API
+delta_table = DeltaTable.forPath(spark, "path/to/delta/table")
+
+# You can now use delta_table for managing your Delta Lake table, e.g., appending data, updating, querying, etc.
+
+
+from pyspark.sql import SparkSession
+
+# Create a Spark session
+spark = SparkSession.builder.appName("View Delta Table").getOrCreate()
+
+# Read the Delta Lake table
+delta_path = "path/to/delta/table"
+delta_df = spark.read.format("delta").load(delta_path)
+
+# Show the first few rows
+delta_df.show()
