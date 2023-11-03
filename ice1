@@ -1,0 +1,44 @@
+from iceberg import Schema
+from iceberg import PartitionSpec
+from iceberg import Table
+from iceberg import DataFile
+from iceberg import Spark
+
+# Create a Spark session
+spark = Spark.builder.config("spark.hadoop.fs.s3a.endpoint", "s3.amazonaws.com").getOrCreate()
+
+# Define your schema with 10 fields
+schema = Schema([
+    ('col1', 'int'),
+    ('col2', 'string'),
+    # Define your other fields here
+    ('col10', 'string')  # The last column
+])
+
+# Create a partitioning spec using the last column
+partition_spec = PartitionSpec.builder_for(schema).identity("col10").build()
+
+# Create an Iceberg table with your schema and partitioning spec
+iceberg_table = Table.create(
+    table_name="my_iceberg_table",
+    schema=schema,
+    spec=partition_spec,
+    format="parquet",
+    location="s3://your-bucket/your-path-to-store-iceberg-table"
+)
+
+# Add Data Files
+data_files = [
+    DataFile.create(
+        path="s3://your-bucket/path-to-parquet-file.parquet",
+        format="parquet",
+        partition={"col10": "partition_value"}  # Replace "partition_value" with the actual partition value
+    )
+]
+
+# Commit the append to the Iceberg table
+iceberg_table.new_append().append_file(data_files).commit()
+
+# Querying the Iceberg Table
+iceberg_df = spark.read.format("iceberg").load("s3://your-bucket/your-path-to-iceberg-table")
+iceberg_df.show()
