@@ -1,0 +1,63 @@
+import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
+import os
+from faker import Faker
+from datetime import datetime
+import boto3
+
+# Initialize Faker to generate fake data
+fake = Faker()
+
+# AWS access key and secret key
+aws_access_key_id = 'your_access_key'
+aws_secret_access_key = 'your_secret_key'
+
+# Generate random data for 1 million records
+data = {
+    'customer_id': range(1, 1000001),
+    'name': [fake.name() for _ in range(1000000)],
+    'birthdate': [fake.date_of_birth(minimum_age=18, maximum_age=90).strftime('%Y-%m-%d') for _ in range(1000000)],
+    'credit_card_number': [fake.credit_card_number(card_type=None) for _ in range(1000000)],
+    'business_date': [fake.date_between(start_date='-1y', end_date='today').strftime('%Y-%m-%d') for _ in range(1000000],
+    'address': [fake.address() for _ in range(1000000)],
+    'email': [fake.email() for _ in range(1000000)],
+    'phone_number': [fake.phone_number() for _ in range(1000000)],
+    'city': [fake.city() for _ in range(1000000)],
+    'country': [fake.country() for _ in range(1000000)],
+    'create_tp': [datetime.now().strftime('%Y-%m-%d %H:%M:%S') for _ in range(1000000)]
+}
+
+df = pd.DataFrame(data)
+
+# Ensure the 'business_date' and 'create_tp' columns are in datetime format
+df['business_date'] = pd.to_datetime(df['business_date'])
+df['create_tp'] = pd.to_datetime(df['create_tp'])
+
+# Create a directory to store the Parquet file
+output_dir = 'parquet_output'
+os.makedirs(output_dir, exist_ok=True)
+
+# Write the DataFrame to a single Parquet file
+table = pa.Table.from_pandas(df)
+
+# Ensure 'business_date' is a partition column
+table = table.add_column(table.column('business_date'), name='partition_col')
+
+# Remove 'business_date' from the schema to avoid writing it as data
+table = table.remove_column(3)
+
+# Write the Parquet file
+pq.write_table(table, f'{output_dir}/customer_demographic.parquet', compression='SNAPPY')
+
+# Upload the Parquet file to S3
+s3 = boto3.client('s3', aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key)
+bucket_name = 'your-s3-bucket-name'
+
+# Specify the S3 key for the uploaded file
+s3_key = 'customer_demographic/business_date='
+
+# Upload the Parquet file to S3
+s3.upload_file(f'{output_dir}/customer_demographic.parquet', bucket_name, s3_key)
+
+print(f"Parquet file uploaded to S3 bucket: s3://{bucket_name}/{s3_key}")
