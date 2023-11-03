@@ -42,3 +42,13 @@ iceberg_table.new_append().append_file(data_files).commit()
 # Querying the Iceberg Table
 iceberg_df = spark.read.format("iceberg").load("s3://your-bucket/your-path-to-iceberg-table")
 iceberg_df.show()
+
+FROM HERE ITS A DIFFERENT ONE
+
+from pyspark.sql import SparkSession
+
+# Create a Spark session
+spark = SparkSession.builder.appName("IcebergSQLQuery").getOrCreate()
+
+
+
