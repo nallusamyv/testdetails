@@ -1,0 +1,52 @@
+pip install iceberg-python
+
+from iceberg.api import (
+    schema as iceschema,
+    PartitionSpec,
+    FileFormat,
+    CreateMode,
+    MetricsConfig,
+)
+from iceberg.core import DataFile, GenericDataFile
+from iceberg.parquet import Parquet
+from iceberg.table import Tables
+
+# Define your schema with 10 fields
+schema = iceschema(
+    fields=[
+        iceschema.optional(1, 'col1', iceschema.Types.IntegerType.get()),
+        iceschema.optional(2, 'col2', iceschema.Types.StringType.get()),
+        # Define your other fields here
+        iceschema.optional(10, 'col10', iceschema.Types.StringType.get())  # The last column
+    ]
+)
+
+# Create a partitioning spec using the last column
+partition_spec = PartitionSpec.builder_for(schema).identity("col10").build()
+
+# Create an Iceberg table with your schema and partitioning spec
+iceberg_table = Tables.create(schema) \
+    .add_location("file:/path/to/iceberg-table") \
+    .create_table()
+
+# Add data files
+data_file = DataFile.create(GenericDataFile(
+    iceberg_table.spec(),
+    Parquet.write_file_format(),
+    "file:/path/to/parquet-file.parquet"
+).with_partition_path("partition_value"))
+
+# Commit the append to the Iceberg table
+iceberg_table.new_append() \
+    .append_file(data_file) \
+    .commit()
+
+# Querying the Iceberg Table
+from iceberg.api import io
+
+table = io.open("file:/path/to/iceberg-table")
+
+# Run SQL-like queries
+filtered_data = table.select("col1", "col2").where("col10 = 'some_value'").as_pandas()
+
+print(filtered_data)
