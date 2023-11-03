@@ -3,9 +3,10 @@ from iceberg import PartitionSpec
 from iceberg import Table
 from iceberg import DataFile
 from iceberg import Spark
+from pyspark.sql import SparkSession
 
 # Create a Spark session
-spark = Spark.builder.config("spark.hadoop.fs.s3a.endpoint", "s3.amazonaws.com").getOrCreate()
+spark = SparkSession.builder.appName("IcebergSQLQuery").getOrCreate()
 
 # Define your schema with 10 fields
 schema = Schema([
@@ -40,15 +41,14 @@ data_files = [
 iceberg_table.new_append().append_file(data_files).commit()
 
 # Querying the Iceberg Table
-iceberg_df = spark.read.format("iceberg").load("s3://your-bucket/your-path-to-iceberg-table")
-iceberg_df.show()
+iceberg_table_location = "s3://your-bucket/your-path-to-iceberg-table"
+iceberg_df = spark.read.format("iceberg").load(iceberg_table_location)
 
-FROM HERE ITS A DIFFERENT ONE
+# Register the DataFrame as a temporary SQL table
+iceberg_df.createOrReplaceTempView("iceberg_table")
 
-from pyspark.sql import SparkSession
+# Run SQL queries
+query_result = spark.sql("SELECT col1, col2 FROM iceberg_table WHERE col3 = 'some_value'")
 
-# Create a Spark session
-spark = SparkSession.builder.appName("IcebergSQLQuery").getOrCreate()
-
-
-
+# Show the query result
+query_result.show()
