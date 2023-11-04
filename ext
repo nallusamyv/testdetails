@@ -1,19 +1,19 @@
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
-import os
 from faker import Faker
 from datetime import datetime
+import os
 import boto3
-
-# Initialize Faker to generate fake data
-fake = Faker()
 
 # AWS access key and secret key
 aws_access_key_id = 'your_access_key'
 aws_secret_access_key = 'your_secret_key'
 
-# Generate random data for 1 million customer demographic records
+# Initialize Faker to generate fake data
+fake = Faker()
+
+# Generate random data for 1 million records
 data = {
     'customer_id': range(1, 1000001),
     'frst_nm': [fake.first_name() for _ in range(1000000)],
@@ -30,37 +30,37 @@ data = {
     'bus_tp': [fake.date_between(start_date='-1y', end_date='today').strftime('%Y-%m-%d') for _ in range(1000000)]
 }
 
+# Create a DataFrame from the data
 df = pd.DataFrame(data)
 
-# Ensure the 'regist_dt', 'create_tp', and 'bus_tp' columns are in datetime format
-df['regist_dt'] = pd.to_datetime(df['regist_dt'])
-df['create_tp'] = pd.to_datetime(df['create_tp'])
+# Ensure 'bus_tp' is in datetime format
 df['bus_tp'] = pd.to_datetime(df['bus_tp'])
 
-# Create a directory to store the Parquet file
+# Create a directory to store the Parquet files
 output_dir = 'parquet_output'
 os.makedirs(output_dir, exist_ok=True)
 
-# Write the DataFrame to a single Parquet file
+# Write the DataFrame to a Parquet file partitioned by 'bus_tp'
 table = pa.Table.from_pandas(df)
 
-# Ensure 'bus_tp' is a partition column
-table = table.add_column(table.column('bus_tp'), name='business_date')
+# Write the Parquet file and partition by 'bus_tp'
+pq.write_to_dataset(
+    table,
+    root_path=output_dir,
+    partition_cols=['bus_tp'],
+    filesystem=None,
+    use_legacy_dataset=False
+)
 
-# Remove 'bus_tp' from the schema to avoid writing it as data
-table = table.remove_column(12)
-
-# Write the Parquet file
-pq.write_table(table, f'{output_dir}/customer_demographic.parquet', compression='SNAPPY')
-
-# Upload the Parquet file to S3
+# Upload the Parquet files to Amazon S3
 s3 = boto3.client('s3', aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key)
-bucket_name = 'your-s3-bucket-name'
+bucket_name = 's3buckettest'
+s3_key_prefix = 'tpa/ace1/'
 
-# Specify the S3 key for the uploaded file
-s3_key = 'customer_demographic/business_date='
+# Upload files to S3
+for root, dirs, files in os.walk(output_dir):
+    for file in files:
+        s3.upload_file(os.path.join(root, file), bucket_name, f'{s3_key_prefix}{file}')
 
-# Upload the Parquet file to S3
-s3.upload_file(f'{output_dir}/customer_demographic.parquet', bucket_name, s3_key)
+print(f"Parquet files uploaded to S3 bucket: s3://{bucket_name}/{s3_key_prefix}")
 
-print(f"Parquet file uploaded to S3 bucket: s3://{bucket_name}/{s3_key}")
