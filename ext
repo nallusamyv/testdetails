@@ -9,26 +9,53 @@ import boto3
 # AWS access key and secret key
 aws_access_key_id = 'your_access_key'
 aws_secret_access_key = 'your_secret_key'
+import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
+from faker import Faker
+from datetime import datetime, timedelta
+import os
+import boto3
+import random
 
 # Initialize Faker to generate fake data
 fake = Faker()
 
-# Generate random data for 1 million records
+# Generate random data for 50 unique business dates, each with one million records
 data = {
-    'customer_id': range(1, 1000001),
-    'frst_nm': [fake.first_name() for _ in range(1000000)],
-    'last_nm': [fake.last_name() for _ in range(1000000)],
-    'dob_dt': [fake.date_of_birth(minimum_age=18, maximum_age=90).strftime('%Y-%m-%d') for _ in range(1000000)],
-    'crt_crd_num': [fake.credit_card_number(card_type=None) for _ in range(1000000)],
-    'regist_dt': [fake.date_between(start_date='-1y', end_date='today').strftime('%Y-%m-%d') for _ in range(1000000),
-    'addr': [fake.address() for _ in range(1000000)],
-    'email_addr': [fake.email() for _ in range(1000000)],
-    'phne_nm': [fake.phone_number() for _ in range(1000000)],
-    'city_nm': [fake.city() for _ in range(1000000)],
-    'cntry_nm': [fake.country() for _ in range(1000000)],
-    'create_tp': [datetime.now().strftime('%Y-%m-%d %H:%M:%S') for _ in range(1000000)],
-    'bus_tp': [fake.date_between(start_date='-1y', end_date='today').strftime('%Y-%m-%d') for _ in range(1000000)]
+    'customer_id': [],
+    'frst_nm': [],
+    'last_nm': [],
+    'dob_dt': [],
+    'crt_crd_num': [],
+    'regist_dt': [],
+    'addr': [],
+    'email_addr': [],
+    'phne_nm': [],
+    'city_nm': [],
+    'cntry_nm': [],
+    'create_tp': [],
+    'bus_tp': []
 }
+
+# Generate data for 50 business dates
+start_date = datetime.now() - timedelta(days=365)
+end_date = datetime.now()
+for _ in range(50):
+    for _ in range(20000):  # 1 million records / 50 dates
+        data['customer_id'].append(fake.unique.random_int(min=1, max=1000000, step=1))
+        data['frst_nm'].append(fake.first_name())
+        data['last_nm'].append(fake.last_name())
+        data['dob_dt'].append(fake.date_of_birth(minimum_age=18, maximum_age=90).strftime('%Y-%m-%d'))
+        data['crt_crd_num'].append(fake.credit_card_number(card_type=None))
+        data['regist_dt'].append(fake.date_between(start_date=start_date, end_date=end_date).strftime('%Y-%m-%d'))
+        data['addr'].append(fake.address())
+        data['email_addr'].append(fake.email())
+        data['phne_nm'].append(fake.phone_number())
+        data['city_nm'].append(fake.city())
+        data['cntry_nm'].append(fake.country())
+        data['create_tp'].append(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        data['bus_tp'].append(fake.date_between(start_date=start_date, end_date=end_date).strftime('%Y-%m-%d'))
 
 # Create a DataFrame from the data
 df = pd.DataFrame(data)
@@ -63,4 +90,3 @@ for root, dirs, files in os.walk(output_dir):
         s3.upload_file(os.path.join(root, file), bucket_name, f'{s3_key_prefix}{file}')
 
 print(f"Parquet files uploaded to S3 bucket: s3://{bucket_name}/{s3_key_prefix}")
-
