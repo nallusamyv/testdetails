@@ -1,0 +1,39 @@
+import pyarrow as pa
+import pyarrow.parquet as pq
+import random
+from datetime import datetime, timedelta
+import os
+import boto3
+
+# AWS credentials (ensure you have configured AWS credentials properly)
+aws_access_key_id = "YOUR_ACCESS_KEY"
+aws_secret_access_key = "YOUR_SECRET_KEY"
+s3_bucket = "your-s3-bucket-name"
+s3_prefix = "s3-folder-prefix"  # Optional prefix within the S3 bucket
+
+# Initialize the S3 client
+s3 = boto3.client('s3', aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key)
+
+# Process each of the four Parquet files
+for file_number in range(1, 5):
+    parquet_file_path = f"path_to_your_file_{file_number}.parquet"
+    table = pq.read_table(parquet_file_path)
+    df = table.to_pandas()
+
+    # Generate a unique partitioned date for each file
+    start_date = datetime(2023, 1, 1)
+    end_date = datetime(2023, 12, 31)
+    df['partitioned_date'] = [start_date + timedelta(days=random.randint(0, 365)) for _ in range(len(df))]
+
+    # Save the modified DataFrame as a new Parquet file
+    output_path = f"{s3_prefix}/path_to_save_modified_file_{file_number}"
+    pq.write_to_dataset(
+        pa.Table.from_pandas(df),
+        root_path=output_path,
+        partition_cols=['partitioned_date']
+    )
+
+    # Upload the Parquet files to S3
+    for root, _, files in os.walk(output_path):
+        for file in files:
+            s3.upload_file(os.path.join(root, file), s3_bucket, f"{output_path}/{file}")
