@@ -1,39 +1,67 @@
 import pyarrow as pa
 import pyarrow.parquet as pq
+import pandas as pd
 import random
-from datetime import datetime, timedelta
-import os
+import datetime
 import boto3
 
-# AWS credentials (ensure you have configured AWS credentials properly)
-aws_access_key_id = "YOUR_ACCESS_KEY"
-aws_secret_access_key = "YOUR_SECRET_KEY"
-s3_bucket = "your-s3-bucket-name"
-s3_prefix = "s3-folder-prefix"  # Optional prefix within the S3 bucket
+# Step 1: Read the Original Parquet File to understand the data types
+original_table = pq.read_table('original.parquet')
+original_schema = original_table.schema
 
-# Initialize the S3 client
-s3 = boto3.client('s3', aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key)
+# Step 2: Create a DataFrame with Partition Dates
+start_date = datetime.datetime(2022, 1, 1)
+end_date = datetime.datetime(2022, 1, 10)  # Adjust the end date as needed
+partition_dates = pd.date_range(start=start_date, end=end_date, freq='D')
+random_partition_dates = random.choices(partition_dates, k=100)  # Select 100 random partition dates
 
-# Process each of the four Parquet files
-for file_number in range(1, 5):
-    parquet_file_path = f"path_to_your_file_{file_number}.parquet"
-    table = pq.read_table(parquet_file_path)
-    df = table.to_pandas()
+# Step 3: Generate Fake Data
+fake_data = []
 
-    # Generate a unique partitioned date for each file
-    start_date = datetime(2023, 1, 1)
-    end_date = datetime(2023, 12, 31)
-    df['partitioned_date'] = [start_date + timedelta(days=random.randint(0, 365)) for _ in range(len(df))]
+# Ensure each partition has at least 100,000 rows
+for partition_date in random_partition_dates:
+    for _ in range(100000):
+        # Create a dictionary to hold the fake data based on the original schema
+        fake_record = {}
+        for field in original_schema:
+            field_name = field.name
+            field_type = field.type
 
-    # Save the modified DataFrame as a new Parquet file
-    output_path = f"{s3_prefix}/path_to_save_modified_file_{file_number}"
-    pq.write_to_dataset(
-        pa.Table.from_pandas(df),
-        root_path=output_path,
-        partition_cols=['partitioned_date']
-    )
+            # Handle different data types
+            if field_type.equals(pa.string()):
+                fake_record[field_name] = f'Fake_String_{random.randint(1, 1000)}'
+            elif field_type.equals(pa.int64()):
+                fake_record[field_name] = random.randint(1, 1000)
+            elif field_type.equals(pa.float64()):
+                fake_record[field_name] = random.uniform(1.0, 1000.0)
+            elif field_type.equals(pa.timestamp('ns')):
+                fake_record[field_name] = datetime.datetime(2022, 1, 1) + datetime.timedelta(days=random.randint(1, 365))
+            elif field_type.equals(pa.decimal128(10, 2)):
+                fake_record[field_name] = round(random.uniform(1.0, 1000.0), 2)
+            elif field_type.equals(pa.date32()):
+                fake_record[field_name] = (datetime.date(2022, 1, 1) + datetime.timedelta(days=random.randint(1, 365))).isoformat()
+            # Add more data type handling as needed
 
-    # Upload the Parquet files to S3
-    for root, _, files in os.walk(output_path):
-        for file in files:
-            s3.upload_file(os.path.join(root, file), s3_bucket, f"{output_path}/{file}")
+        # Include the partition_date
+        fake_record['partition_date'] = partition_date
+        fake_data.append(fake_record)
+
+# Create a Pandas DataFrame from the fake data
+fake_df = pd.DataFrame(fake_data)
+
+# Step 4: Write the Fake Data to a Parquet File
+fake_table = pa.Table.from_pandas(fake_df)
+
+# Write the fake data to a local Parquet file
+pq.write_table(fake_table, 'fake_data.parquet')
+
+# Step 5: Upload the Parquet File to S3 with Partitioning
+bucket_name = 'your-s3-bucket-name'
+s3_key = 'path/to/destination/'
+
+# Create partitions based on 'partition_date'
+for partition_date in random_partition_dates:
+    partitioned_s3_key = f'{s3_key}partition_date={partition_date.strftime("%Y-%m-%d")}/'
+    s3.upload_file('fake_data.parquet', bucket_name, f'{partitioned_s3_key}customer_sub_file.parquet')
+
+print(f'Fake data uploaded to S3 with partitioning: s3://{bucket_name}/{s3_key}')
