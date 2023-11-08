@@ -1,67 +1,16 @@
-import sys
-from faker import Faker
-from datetime import datetime, timedelta
-from pyspark.context import SparkContext
-from pyspark.sql import SparkSession
-from delta import DeltaTable
+write_options = pa.parquet.ParquetWriteOptions(compression='SNAPPY')
 
-# Initialize Faker to generate fake data
-fake = Faker()
+# Write the fake data to a local Parquet file with Snappy compression
+pq.write_table(fake_table, 'fake_data.parquet', write_options=write_options)
 
-# Create a Spark session
-sc = SparkContext()
-spark = SparkSession(sc)
+# Step 5: Upload the Parquet File to S3 with Partitioning
+bucket_name = 'your-s3-bucket-name'
+s3_key = 'path/to/destination/'
 
-# Generate random data for 50 unique business dates, each with one million records
-data = {
-    'customer_id': [],
-    'frst_nm': [],
-    'last_nm': [],
-    'dob_dt': [],
-    'crt_crd_num': [],
-    'regist_dt': [],
-    'addr': [],
-    'email_addr': [],
-    'phne_nm': [],
-    'city_nm': [],
-    'cntry_nm': [],
-    'create_tp': [],
-    'bus_tp': []
-}
+s3 = boto3.resource('s3')  # Create an S3 resource
+bucket = s3.Bucket(bucket_name)  # Specify the bucket
 
-# Generate data for 50 business dates
-start_date = datetime.now() - timedelta(days=365)
-end_date = datetime.now()
-for _ in range(50):
-    for _ in range(20000):  # 1 million records / 50 dates
-        data['customer_id'].append(fake.unique.random_int(min=1, max=1000000, step=1))
-        data['frst_nm'].append(fake.first_name())
-        data['last_nm'].append(fake.last_name())
-        data['dob_dt'].append(fake.date_of_birth(minimum_age=18, maximum_age=90).strftime('%Y-%m-%d'))
-        data['crt_crd_num'].append(fake.credit_card_number(card_type=None))
-        data['regist_dt'].append(fake.date_between(start_date=start_date, end_date=end_date).strftime('%Y-%m-%d'))
-        data['addr'].append(fake.address())
-        data['email_addr'].append(fake.email())
-        data['phne_nm'].append(fake.phone_number())
-        data['city_nm'].append(fake.city())
-        data['cntry_nm'].append(fake.country())
-        data['create_tp'].append(datetime.now().strftime('%Y-%m-%d %H:M:S'))
-        data['bus_tp'].append(fake.date_between(start_date=start_date, end_date=end_date).strftime('%Y-%m-%d'))
-
-# Create a DataFrame from the data
-df = spark.createDataFrame(list(data.values()), list(data.keys()))
-
-# Specify the S3 path where the Delta Lake table will be stored
-s3_path = "s3a://your-s3-bucket-name/path-to-your-table"
-
-# Write the DataFrame to a Delta Lake table with 'bus_tp' as a partition column
-df.write.format("delta").mode("overwrite").save(s3_path)
-
-# Create a DeltaTable object for further operations
-delta_table = DeltaTable.forPath(spark, s3_path)
-
-# Vacuum the Delta Lake table (optional but can help with data retention)
-delta_table.vacuum(0)
-
-# Stop the Spark session
-spark.stop()
+# Create partitions based on 'partition_date'
+for partition_date in random_partition_dates:
+    partitioned_s3_key = f'{s3_key}partition_date={partition_date.strftime("%Y-%m-%d")}/customer_sub_file.parquet'
+    bucket.upload_file('fake_data.parquet', partitioned_s3_key)
