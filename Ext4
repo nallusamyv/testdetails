@@ -3,6 +3,46 @@ import pyarrow.parquet as pq
 import pandas as pd
 import random
 import datetime
+from faker import Faker
+
+# Initialize Faker
+fake = Faker()
+
+# Step 1: Read the Original Parquet File to understand the data types
+original_table = pq.read_table('original.parquet')
+original_schema = original_table.schema
+
+# Step 2: Create a DataFrame with Partition Dates
+start_date = datetime.datetime(2022, 1, 1)
+end_date = datetime.datetime(2022, 1, 10)  # Adjust the end date as needed
+partition_dates = pd.date_range(start=start_date, end=end_date, freq='D')
+
+# Step 3: Repeat Original Content for Each Partition Date with Modified SSN
+repeated_data = []
+
+for partition_date in partition_dates:
+    # Convert PyArrow table to Pandas DataFrame
+    original_df = original_table.to_pandas()
+
+    # Add partition_date column
+    original_df['partition_date'] = partition_date
+
+    # Modify the 'ssn_field' to a random SSN-like value for each row
+    original_df['ssn_field'] = [fake.ssn() for _ in range(len(original_df))]
+
+    # Append to the repeated_data list
+    repeated_data.append(original_df)
+
+# Concatenate all DataFrames into a single DataFrame
+repeated_df = pd.concat(repeated_data, ignore_index=True)
+
+# Create a PyArrow table from the repeated data
+repeated_table = pa.Table.from_pandas(repeated_df)
+ pyarrow as pa
+import pyarrow.parquet as pq
+import pandas as pd
+import random
+import datetime
 import boto3
 
 # Step 1: Read the Original Parquet File to understand the data types
