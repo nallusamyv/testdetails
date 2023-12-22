@@ -1,1 +1,19 @@
-Data access control is essential in IT to secure and manage data. It's a key component of data governance and contributes to business continuity and data availability.To implement the fine grained access control, Immuta capabilities have been thoroughly examined and documented. Furthermore, a distinct Immuta/JEMS instance has been established specifically for the CT department's use, serving as a centralized platform for configuring access controls across a variety of cloud and on-premises environments. This dedicated instances will be used by entire CT area to use Immuta. To elaborate on the merits of Immuta, a proof of concept has been executed to enforce detailed access controls for Redshift Spectrum. This involved the deployment of various access control scenarios and the thorough evaluation of overarching performance metrics, highlighting the concrete benefits of Immuta in enabling fine-grained access control.
+from pyspark.context import SparkContext
+from pyspark.sql import SparkSession
+
+# Create a SparkSession
+spark = SparkSession.builder.appName("example").getOrCreate()
+
+# Read Parquet file into a DataFrame
+input_file_path = "s3://your-bucket/input_file.parquet"
+df = spark.read.parquet(input_file_path)
+
+# Modify the DataFrame (replace this with your own modifications)
+df = df.withColumn('new_column', df['existing_column'] * 2)
+
+# Write the modified DataFrame to a new Parquet file
+output_file_path = "s3://your-bucket/output_file.parquet"
+df.write.parquet(output_file_path, mode='overwrite')
+
+# Stop the SparkSession
+spark.stop()
