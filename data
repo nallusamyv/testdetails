@@ -7,3 +7,6 @@ if not spark._jsparkSession.catalog().tableExists(iceberg_output_path):
 else:
     # If the table exists, append data to it
     df.write.format("iceberg").mode("append").option("uri", iceberg_output_path).saveAsTable("default.my_iceberg_table")
+
+
+df.write.format("iceberg").mode("append").option("path", iceberg_output_path).save()
