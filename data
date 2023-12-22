@@ -1,6 +1,9 @@
 from pyspark.context import SparkContext
 from pyspark.sql import SparkSession
 
+# Import Iceberg libraries
+from com.netflix.iceberg.spark import SparkSessionCatalog
+
 # Create a SparkSession
 spark = SparkSession.builder.appName("example").getOrCreate()
 
@@ -11,9 +14,11 @@ df = spark.read.parquet(input_file_path)
 # Modify the DataFrame (replace this with your own modifications)
 df = df.withColumn('new_column', df['existing_column'] * 2)
 
-# Write the modified DataFrame to a new Parquet file
-output_file_path = "s3://your-bucket/output_file.parquet"
-df.write.parquet(output_file_path, mode='overwrite')
+iceberg_table_location = "s3://your-bucket/iceberg_table"
+
+# Write the modified DataFrame to a new Iceberg table
+df.write.format("iceberg").mode("overwrite").save(iceberg_table_location)
 
 # Stop the SparkSession
 spark.stop()
+
