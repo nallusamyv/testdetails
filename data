@@ -9,4 +9,29 @@ else:
     df.write.format("iceberg").mode("append").option("uri", iceberg_output_path).saveAsTable("default.my_iceberg_table")
 
 
-df.write.format("iceberg").mode("append").option("path", iceberg_output_path).save()
+from awsglue.context import GlueContext
+from pyspark.context import SparkContext
+from awsglue.dynamicframe import DynamicFrame
+
+# Create a GlueContext and SparkContext
+glueContext = GlueContext(SparkContext.getOrCreate())
+
+# Specify the paths
+parquet_input_path = "s3://your-bucket/input_file.parquet"
+iceberg_output_path = "s3://your-bucket/output_iceberg_table"
+
+# Read Parquet data into a DynamicFrame
+dynamic_frame = glueContext.create_dynamic_frame.from_catalog(database="your_database", table_name="your_parquet_table")
+
+# Write DynamicFrame to Iceberg table
+glueContext.write_dynamic_frame.from_catalog(
+    frame=dynamic_frame,
+    database="default",
+    table_name="my_iceberg_table",
+    transformation_ctx="datasink0",
+    format="iceberg",
+    format_options={"write.operation": "overwrite"},
+    catalog_versioning=False,  # Optional, set to True if you want to enable catalog versioning
+    additional_options={"write.location": iceberg_output_path}  # Specify the Iceberg output path
+)
+
