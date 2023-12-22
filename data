@@ -8,17 +8,12 @@ else:
     # If the table exists, append data to it
     df.write.format("iceberg").mode("append").option("uri", iceberg_output_path).saveAsTable("default.my_iceberg_table")
 
-# Read Parquet data into a DynamicFrame
-dynamic_frame = glueContext.create_dynamic_frame.from_catalog(path=parquet_input_path, format="parquet")
-
-# Write DynamicFrame to Iceberg table
 glueContext.write_dynamic_frame.from_catalog(
     frame=dynamic_frame,
-    database="default",
-    table_name="my_iceberg_table",
-    transformation_ctx="datasink0",
+    catalog_database=None,  # No need to specify a database
+    catalog_table_name=None,  # No need to specify a table name
+    connection_options={"write.location": iceberg_output_path},  # Specify the Iceberg output path
     format="iceberg",
     format_options={"write.operation": "overwrite"},
-    catalog_versioning=False,  # Optional, set to True if you want to enable catalog versioning
-    additional_options={"write.location": iceberg_output_path}  # Specify the Iceberg output path
+    transformation_ctx="datasink0"
 )
