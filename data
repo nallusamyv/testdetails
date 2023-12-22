@@ -1,24 +1,7 @@
-from pyspark.context import SparkContext
-from pyspark.sql import SparkSession
-
-# Import Iceberg libraries
-from com.netflix.iceberg.spark import SparkSessionCatalog
-
-# Create a SparkSession
-spark = SparkSession.builder.appName("example").getOrCreate()
-
-# Read Parquet file into a DataFrame
-input_file_path = "s3://your-bucket/input_file.parquet"
-df = spark.read.parquet(input_file_path)
-
-# Modify the DataFrame (replace this with your own modifications)
-df = df.withColumn('new_column', df['existing_column'] * 2)
-
-iceberg_table_location = "s3://your-bucket/iceberg_table"
-
-# Write the modified DataFrame to a new Iceberg table
-df.write.format("iceberg").mode("overwrite").save(iceberg_table_location)
-
-# Stop the SparkSession
-spark.stop()
-
+spark = SparkSession.builder \
+    .config(f'spark.sql.catalog.{CATALOG}', 'org.apache.iceberg.spark.SparkCatalog') \
+    .config(f'spark.sql.catalog.{CATALOG}.warehouse', WAREHOUSE_PATH) \
+    .config(f'spark.sql.catalog.{CATALOG}.catalog-impl', 'org.apache.iceberg.aws.glue.GlueCatalog') \
+    .config(f'spark.sql.catalog.{CATALOG}.io-impl', 'org.apache.iceberg.aws.s3.S3FileIO') \
+    .config('spark.sql.extensions','org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions') \
+    .getOrCreate()
