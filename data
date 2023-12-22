@@ -1,1 +1,11 @@
 https://github.com/developer-advocacy-dremio/quick-guides-from-dremio/tree/main
+
+# Extract the schema from the DataFrame
+iceberg_schema = Schema.from_pyspark_schema(df.schema)
+
+# Create the Iceberg table
+table = Table.create(iceberg_schema, iceberg_output_path)
+table.save()
+
+# Write the DataFrame to Iceberg table
+df.write.format("iceberg").mode("append").option("uri", iceberg_output_path).saveAsTable("default.my_iceberg_table")
