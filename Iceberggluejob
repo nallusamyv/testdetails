@@ -1,0 +1,48 @@
+import sys
+from awsglue.transforms import *
+from awsglue.utils import getResolvedOptions
+from pyspark.context import SparkContext
+from awsglue.context import GlueContext
+from awsglue.job import Job
+
+args = getResolvedOptions(sys.argv, ["JOB_NAME"])
+sc = SparkContext()
+glueContext = GlueContext(sc)
+spark = glueContext.spark_session
+job = Job(glueContext)
+job.init(args["JOB_NAME"], args)
+
+# Script generated for node Amazon S3
+AmazonS3_node1704077320678 = glueContext.create_dynamic_frame.from_options(
+    format_options={},
+    connection_type="s3",
+    format="parquet",
+    connection_options={"paths": ["s3://parquetbuckettesting/input.parquet"]},
+    transformation_ctx="AmazonS3_node1704077320678",
+)
+
+# Script generated for node Amazon S3
+additional_options = {"write.parquet.compression-codec": "gzip"}
+tables_collection = spark.catalog.listTables("firstdb")
+table_names_in_db = [table.name for table in tables_collection]
+table_exists = "iceberg" in table_names_in_db
+if table_exists:
+    AmazonS3_node1704077351228_df = AmazonS3_node1704077320678.toDF()
+    AmazonS3_node1704077351228_df.writeTo("glue_catalog.firstdb.iceberg").tableProperty(
+        "format-version", "2"
+    ).tableProperty(
+        "location", "s3://parquetbuckettesting/icebergoutput/iceberg/firstdb/iceberg"
+    ).options(
+        **additional_options
+    ).append()
+else:
+    AmazonS3_node1704077351228_df = AmazonS3_node1704077320678.toDF()
+    AmazonS3_node1704077351228_df.writeTo("glue_catalog.firstdb.iceberg").tableProperty(
+        "format-version", "2"
+    ).tableProperty(
+        "location", "s3://parquetbuckettesting/icebergoutput/iceberg/firstdb/iceberg"
+    ).options(
+        **additional_options
+    ).create()
+
+job.commit()
