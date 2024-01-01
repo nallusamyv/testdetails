@@ -1,0 +1,28 @@
+from pyspark.sql import SparkSession
+
+# Initialize Spark session
+spark = SparkSession.builder.appName("ParquetToIceberg").getOrCreate()
+
+# Specify source Parquet path in S3
+source_path = 's3://your-source-bucket/source-path/'  # Replace with your actual source path
+
+# Specify target Iceberg table
+iceberg_database = 'your_database_name'  # Replace with your actual Lake Formation database name
+iceberg_table_name = 'your_iceberg_table_name'  # Replace with your actual Iceberg table name
+iceberg_table_path = f's3://your-target-bucket/target-path/{iceberg_table_name}/'  # Replace with your actual target path
+
+# Read Parquet data directly into Spark DataFrame
+parquet_df = spark.read.parquet(source_path)
+
+# Write Spark DataFrame to Iceberg table
+parquet_df.write.format('iceberg').mode('overwrite').save(iceberg_table_path)
+
+# Catalog the Iceberg table in AWS Glue Data Catalog
+spark.sql(f"""
+    CREATE TABLE {iceberg_database}.{iceberg_table_name}
+    USING iceberg
+    LOCATION '{iceberg_table_path}'
+""")
+
+# Stop the Spark session
+spark.stop()
