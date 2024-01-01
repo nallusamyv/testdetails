@@ -1,52 +1,42 @@
-pip install iceberg-python
+import sys
+from awsglue.context import GlueContext
+from awsglue.job import Job
+from pyspark.context import SparkContext
 
-from iceberg.api import (
-    schema as iceschema,
-    PartitionSpec,
-    FileFormat,
-    CreateMode,
-    MetricsConfig,
+# Initialize Spark and Glue contexts
+sc = SparkContext()
+glueContext = GlueContext(sc)
+spark = glueContext.spark_session
+job = Job(glueContext)
+job.init('ParquetToLakeFormationTableJob')
+
+# Specify source and target S3 paths
+source_path = 's3://your-source-bucket/source-path/'  # Replace with your actual source path
+database_name = 'your_database_name'  # Replace with your actual Lake Formation database name
+table_name = 'your_table_name'  # Replace with your desired Glue table name
+target_path = f's3://your-target-bucket/target-path/{table_name}/'  # Replace with your actual target path
+
+# Create a DynamicFrame for the source Parquet data
+source_dyf = glueContext.create_dynamic_frame.from_catalog(
+    database=database_name,
+    table_name='your_parquet_table'  # Replace with your actual Parquet table name
 )
-from iceberg.core import DataFile, GenericDataFile
-from iceberg.parquet import Parquet
-from iceberg.table import Tables
 
-# Define your schema with 10 fields
-schema = iceschema(
-    fields=[
-        iceschema.optional(1, 'col1', iceschema.Types.IntegerType.get()),
-        iceschema.optional(2, 'col2', iceschema.Types.StringType.get()),
-        # Define your other fields here
-        iceschema.optional(10, 'col10', iceschema.Types.StringType.get())  # The last column
-    ]
+# Convert DynamicFrame to Spark DataFrame
+source_df = source_dyf.toDF()
+
+# Write the Spark DataFrame to S3 in Parquet format
+source_df.write.mode('overwrite').parquet(target_path)
+
+# Create a DynamicFrame for the target Glue table using Glue DataBrew
+target_dyf = glueContext.create_dynamic_frame.from_catalog(
+    database=database_name,
+    table_name=table_name,
+    transformation_ctx='target_dyf'
 )
 
-# Create a partitioning spec using the last column
-partition_spec = PartitionSpec.builder_for(schema).identity("col10").build()
+# Print the schema of the target DynamicFrame (optional)
+target_dyf.printSchema()
 
-# Create an Iceberg table with your schema and partitioning spec
-iceberg_table = Tables.create(schema) \
-    .add_location("file:/path/to/iceberg-table") \
-    .create_table()
-
-# Add data files
-data_file = DataFile.create(GenericDataFile(
-    iceberg_table.spec(),
-    Parquet.write_file_format(),
-    "file:/path/to/parquet-file.parquet"
-).with_partition_path("partition_value"))
-
-# Commit the append to the Iceberg table
-iceberg_table.new_append() \
-    .append_file(data_file) \
-    .commit()
-
-# Querying the Iceberg Table
-from iceberg.api import io
-
-table = io.open("file:/path/to/iceberg-table")
-
-# Run SQL-like queries
-filtered_data = table.select("col1", "col2").where("col10 = 'some_value'").as_pandas()
-
-print(filtered_data)
+# Commit the job
+job.commit()
