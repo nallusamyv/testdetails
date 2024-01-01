@@ -1,48 +1,38 @@
 import sys
-from awsglue.transforms import *
-from awsglue.utils import getResolvedOptions
-from pyspark.context import SparkContext
 from awsglue.context import GlueContext
 from awsglue.job import Job
+from pyspark.context import SparkContext
 
-args = getResolvedOptions(sys.argv, ["JOB_NAME"])
+# Initialize Spark and Glue contexts
 sc = SparkContext()
 glueContext = GlueContext(sc)
 spark = glueContext.spark_session
 job = Job(glueContext)
-job.init(args["JOB_NAME"], args)
+job.init('ParquetToLakeFormationTableJob')
 
-# Script generated for node Amazon S3
-AmazonS3_node1704077320678 = glueContext.create_dynamic_frame.from_options(
-    format_options={},
-    connection_type="s3",
-    format="parquet",
-    connection_options={"paths": ["s3://parquetbuckettesting/input.parquet"]},
-    transformation_ctx="AmazonS3_node1704077320678",
+# Specify source and target S3 paths
+source_path = 's3://your-source-bucket/source-path/'  # Replace with your actual source path
+database_name = 'your_database_name'  # Replace with your actual Lake Formation database name
+table_name = 'your_table_name'  # Replace with your desired Glue table name
+target_path = f's3://your-target-bucket/target-path/{table_name}/'  # Replace with your actual target path
+
+# Create a DynamicFrame for the source Parquet data
+source_dyf = glueContext.create_dynamic_frame.from_catalog(
+    database=None,
+    table_name=None,
+    path=source_path
 )
 
-# Script generated for node Amazon S3
-additional_options = {"write.parquet.compression-codec": "gzip"}
-tables_collection = spark.catalog.listTables("firstdb")
-table_names_in_db = [table.name for table in tables_collection]
-table_exists = "iceberg" in table_names_in_db
-if table_exists:
-    AmazonS3_node1704077351228_df = AmazonS3_node1704077320678.toDF()
-    AmazonS3_node1704077351228_df.writeTo("glue_catalog.firstdb.iceberg").tableProperty(
-        "format-version", "2"
-    ).tableProperty(
-        "location", "s3://parquetbuckettesting/icebergoutput/iceberg/firstdb/iceberg"
-    ).options(
-        **additional_options
-    ).append()
-else:
-    AmazonS3_node1704077351228_df = AmazonS3_node1704077320678.toDF()
-    AmazonS3_node1704077351228_df.writeTo("glue_catalog.firstdb.iceberg").tableProperty(
-        "format-version", "2"
-    ).tableProperty(
-        "location", "s3://parquetbuckettesting/icebergoutput/iceberg/firstdb/iceberg"
-    ).options(
-        **additional_options
-    ).create()
+# Infer the schema and create a new Glue table in Lake Formation
+target_dyf = glueContext.create_dynamic_frame.from_catalog(
+    database=database_name,
+    table_name=table_name,
+    path=target_path,
+    transformation_ctx='target_dyf'
+)
 
+# Print the schema of the target DynamicFrame (optional)
+target_dyf.printSchema()
+
+# Commit the job
 job.commit()
