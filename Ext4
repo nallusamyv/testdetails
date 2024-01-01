@@ -1,2 +1,4 @@
-spark.conf.set("spark.sql.catalog.ic", "org.apache.iceberg.spark.SparkSessionCatalog")
-spark.conf.set("spark.sql.catalog.ic.type", "hive")
+spark = SparkSession.builder \
+    .appName("ParquetToIceberg") \
+    .config("spark.jars.packages", "org.apache.iceberg:iceberg-spark3:0.12.0") \
+    .getOrCreate()
