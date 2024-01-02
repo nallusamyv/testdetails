@@ -1,30 +1,6 @@
 
-pip install delta-io
+Our project goal is to access Parquet files stored in an S3 bucket from Snowflake. To achieve this, we decided to use external tables. A CADS request has been initiated for the S3 bucket from my non-CNA Snowflake account. The Snowflake onboarding process led to the creation of the DEV_1111_DB. The CADS request provided the storage integration value, and we utilized Terraform to create a schema under this database. Additionally, an external stage pointing to the S3 bucket was established with the assistance of the storage integration. The staging process successfully lists the files present in the S3 bucket. However, we are encountering challenges in creating the external table.
 
+In the midst of troubleshooting, I came across information suggesting the creation of a separate database (DEV_1111_EXT_DB) specifically for Snowflake external tables. The SRE team has confirmed that external tables require an external database, which is not a requirement enforced by Snowflake. I would like clarification from an Atlas perspective on whether external tables must be created under a database with the "_EXT_DB" extension or if it is acceptable to create them under a normal database.
 
-from delta import DeltaTable
-
-# Specify the path to the Parquet data
-parquet_path = "path/to/parquet/directory"
-
-# Specify the path to the Delta Lake table
-delta_path = "path/to/delta/table"
-
-# Load the Parquet data and convert it to a Delta table
-delta_table = DeltaTable.convertToDelta(spark, parquet_path, delta_path)
-
-# You can now manage the Delta table using delta_table, e.g., querying, appending data, and more.
-
-
-
-from delta import DeltaTable
-
-# Load the Delta Lake table
-delta_path = "path/to/delta/table"
-delta_table = DeltaTable(spark, delta_path)
-
-# Read the contents into a DataFrame
-delta_df = delta_table.toDF()
-
-# Show the first few rows
-delta_df.show()
+If the creation of an EXT_DB is deemed necessary, it appears that utilizing the HASS API is required for this process. This involves obtaining access and generating a new FID. Although we have already created a new FID for use with Terraform in Snowflake, the question arises whether we can proceed with using the same FID for the creation of EXT_DB. Additionally, if EXT_DB is indeed required, we may require assistance from the Snowflake team to facilitate its creation under the same context. Your guidance on this matter would be greatly appreciated.
