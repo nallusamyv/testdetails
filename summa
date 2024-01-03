@@ -1,1 +1,7 @@
-We have scheduled the migration of our on-premises application to the cloud, with the first phase set for implementation in Q4-2023. This initial phase will focus on minor aspects, while the complete migration is slated for the following year. In line with the established guidelines, we have completed the documentation required for provisioning the production account. The next steps involve obtaining ISM (Information Security Management) approval and seeking the necessary cloud ISM approval to proceed with the migration process.
+As we proceed with the onboarding process to Snowflake, we have encountered a query regarding the Snowflake Immuta integration, specifically in relation to external tables.
+
+During our discussions with the Snowflake team, we learned that external tables are accessed through the _EXT_DB database, and there is a designated role, DEV_Sealid_EXT_DATA_ENGINEER_FR. Our standard database is DEV_Soul_DB, while the external database is identified as DEV_Soul_FRDC_EXT_DB.
+
+As part of the Snowflake Immuta integration guidelines, we have been instructed to grant the role DEV_1111_DATA_ENGINEER_FR to facilitate Snowflake's access to the Snowflake schema and tables. However, we have noticed that the specified role for external tables is DEV_Soul_FRDC_EXT_DB.
+
+In light of this, we seek clarification on whether the Snowflake Immuta integration fully supports external tables and if any adjustments are required in terms of roles and permissions to ensure a smooth integration for both internal and external table
