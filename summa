@@ -1,2 +1,31 @@
+from awsglue.context import GlueContext
+from pyspark.context import SparkContext
+from pyspark.sql import SparkSession
+from pyspark.sql import iceberg
+from awsglue.dynamicframe import DynamicFrame
 
-When executing a "SELECT * FROM" query on an external table in Snowflake, an additional column named "VALUE" is displayed, containing the entire record. Following my discussion with the Snowflake integration team, they mentioned the capability to integrate with the "EXT_DB" field. I'm curious about how this field will be recognized or managed within Immuta
+# Initialize Spark and Glue contexts
+sc = SparkContext()
+glueContext = GlueContext(sc)
+spark = glueContext.spark_session
+
+# 1. Read Parquet File
+parquetDF = spark.read.parquet("s3://your-parquet-path")
+
+# 2. Write to Iceberg Table
+iceberg_table_location = "s3://your-iceberg-table-path"
+iceberg_table = iceberg.Table.create(
+    iceberg_table_location,
+    schema=parquetDF.schema,
+    properties={"write.format.default": "parquet"}
+)
+iceberg_table.newAppend().append(parquetDF).commit()
+
+# 3. Create Glue Catalog Entry
+parquet_dynamic_frame = DynamicFrame.fromDF(parquetDF, glueContext, "parquet_dynamic_frame")
+glueContext.write_dynamic_frame.from_catalog(
+    frame=parquet_dynamic_frame,
+    database="your_glue_database",
+    table_name="your_glue_table",
+    transformation_ctx="write_to_glue_table"
+)
