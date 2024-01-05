@@ -1,1 +1,12 @@
-Hello JJ, as we talked about, one of our use cases for migrating to Snowflake involves linking S3 files exposed as external tables in Snowflake with CBC tables. Could you kindly provide details or examples of S3 files/Athena tables and CBC tables that need to be linked to achieve the desired results? This information would greatly assist in conducting a proof of concept for the data sharing feature in Snowflake between our account and CBC account. Thank you
+
+In Snowflake, external tables are established under the "ext_db" schema, with the data concurrently copied to regular tables in the "DB" schema. A noteworthy distinction lies in the partition date field. In the external files, the partition date is stored as "partition_date=20220323." When ingested by Glue, it interprets "partition_date" as the partition field and "20220323" as its value. This variance arises because the Snowflake external file's partition field is created from the metadata field value, while all other fields are extracted from a variant type field.
+
+It's important to note that Glue doesn't consider field case sensitivity, whereas Snowflake is case-sensitive. When reading Parquet files, the field names must be specified in Snowflake with case sensitivity.
+
+Currently, all five tables have their external counterparts created under the "ext_db" schema, and the corresponding data is available in regular Snowflake tables under the "DB" schema.
+
+Regarding the Redshift cluster, as mentioned yesterday, we are still encountering difficulties in resuming the cluster to a 24*7 operational state. The PS team is interested in testing the Terraform script during a period when the cluster is not in pause mode, planning to resume it at 3 pm for an hour. During this time, I will attempt to execute the script and provide updates accordingly. If the issue persists, there is a consideration to create a new Redshift cluster. The only task remaining in this scenario would be to handle the integration on the Immuta side. I'll keep you informed of any 
+
+
+
+Regarding the integration of Snowflake with Immuta, I have provided the necessary details to the Immuta team. They have responded, indicating that the integration process is scheduled to be completed in the middle of next week. Please find the conversation below for your reference.
