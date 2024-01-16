@@ -1,0 +1,30 @@
+Immuta leverages metadata and tags to enforce data governance policies in a tag-driven manner.
+
+
+Certainly, here's a concise bullet-point summary:
+
+Snowflake (Immuta Policy Enforcement):
+Native Integration:
+
+Immuta enforces policies natively within the Snowflake environment.
+User AD groups are not tied to specific platforms; policies are seamlessly applied in Snowflake.
+Flexibility:
+
+Users' AD groups are not platform-specific, offering flexibility in policy application.
+Policies are enforced directly within Snowflake without the need for additional dependencies.
+Policy Consistency:
+
+Same subscription policies and data policies are pushed to Snowflake, ensuring consistent enforcement.
+Redshift (Immuta Policy Enforcement):
+Enforcement in Spectrum:
+
+Immuta enforces policies by creating views in the Redshift Spectrum layer.
+Policies are applied to the data queried through Spectrum, providing a layer of abstraction.
+Centralized Policy Management:
+
+Immuta centrally manages policies, pushing them to Redshift Spectrum for enforcement.
+Users can interact with data through views, ensuring policy adherence.
+Dynamic View Creation:
+
+Policies translate into dynamic view creation in the Redshift Spectrum environment.
+Data access controls and dynamic data masking are applied through these views.
