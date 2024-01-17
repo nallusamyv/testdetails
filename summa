@@ -1,31 +1,12 @@
-from awsglue.context import GlueContext
-from pyspark.context import SparkContext
-from pyspark.sql import SparkSession
-from pyspark.sql import iceberg
-from awsglue.dynamicframe import DynamicFrame
 
-# Initialize Spark and Glue contexts
-sc = SparkContext()
-glueContext = GlueContext(sc)
-spark = glueContext.spark_session
+Five tables (A, B, C) are exposed as external tables in both Redshift and Snowflake, utilizing the same subscription and data policy, and are functioning smoothly.
 
-# 1. Read Parquet File
-parquetDF = spark.read.parquet("s3://your-parquet-path")
+The Parquet format must be transformed into Iceberg format within S3, and there is a requirement to access this data in Snowflake.
 
-# 2. Write to Iceberg Table
-iceberg_table_location = "s3://your-iceberg-table-path"
-iceberg_table = iceberg.Table.create(
-    iceberg_table_location,
-    schema=parquetDF.schema,
-    properties={"write.format.default": "parquet"}
-)
-iceberg_table.newAppend().append(parquetDF).commit()
+We require information from Krishna to determine which tables are suitable for this demo.
 
-# 3. Create Glue Catalog Entry
-parquet_dynamic_frame = DynamicFrame.fromDF(parquetDF, glueContext, "parquet_dynamic_frame")
-glueContext.write_dynamic_frame.from_catalog(
-    frame=parquet_dynamic_frame,
-    database="your_glue_database",
-    table_name="your_glue_table",
-    transformation_ctx="write_to_glue_table"
-)
+I intend to create the aforementioned tables in a different schema for the demonstration.
+
+I intend to create the aforementioned tables in a different database for the demonstration.
+
+Information needs to be gathered from the CCB and CUBE teams to identify tables that are well-suited for this specific requirement.
