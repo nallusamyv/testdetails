@@ -1,30 +1,72 @@
-Immuta leverages metadata and tags to enforce data governance policies in a tag-driven manner.
+User data section.
 
 
-Certainly, here's a concise bullet-point summary:
+1. EC2
 
-Snowflake (Immuta Policy Enforcement):
-Native Integration:
+Enable public IP Address (Yes for public)
 
-Immuta enforces policies natively within the Snowflake environment.
-User AD groups are not tied to specific platforms; policies are seamlessly applied in Snowflake.
-Flexibility:
+#!/bin/bash     
+sudo su     
+yum update -y       
+yum install httpd -y            
+echo "<html><h1> Welcome to Whizlabs Server 1 </h1><html>" > /var/www/html/index.html               
+systemctl start httpd       
+systemctl enable httpd	 - PRAN Card & self-attested Pan Card are mandatory documents required for SA To NPS.
 
-Users' AD groups are not platform-specific, offering flexibility in policy application.
-Policies are enforced directly within Snowflake without the need for additional dependencies.
-Policy Consistency:
 
-Same subscription policies and data policies are pushed to Snowflake, ensuring consistent enforcement.
-Redshift (Immuta Policy Enforcement):
-Enforcement in Spectrum:
+2. ECS Load balancer
 
-Immuta enforces policies by creating views in the Redshift Spectrum layer.
-Policies are applied to the data queried through Spectrum, providing a layer of abstraction.
-Centralized Policy Management:
+Security Group for both Load balancer and ECS
 
-Immuta centrally manages policies, pushing them to Redshift Spectrum for enforcement.
-Users can interact with data through views, ensuring policy adherence.
-Dynamic View Creation:
+ECS Security Group allows from ALB Security Group
 
-Policies translate into dynamic view creation in the Redshift Spectrum environment.
-Data access controls and dynamic data masking are applied through these views.
+Target group can be created without targets and assigned to Loadbalancer.  And later assign the target
+
+ECS Cluster - Require the instance and Key pair
+
+Under Container - 1
+
+Container name: Enter httpd
+Image: enter httpd:2.4 (make sure no extra space is given)
+
+
+3. S3 - Cloudfront
+
+Object Ownership: Select ACLs enabled option and choose Object writer as Object owner
+
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "Statement1",
+            "Effect": "Allow",
+            "Principal": {
+                "AWS": "*"
+            },
+            "Action": "s3:*",
+            "Resource": "arn:aws:s3:::whizlabs123456789"
+        }
+    ]
+}
+
+
+Cloudfront - setup error(404)/block(based on geographic 403) in the distribution
+
+
+4. ec2 basic
+
+sudo su
+yum -y update
+
+
+
+login to private ec2\
+chmod 400 MyKey.pem
+ssh  ec2-user@<Private IP of MyPrivateEC2Server> -i MyKey.pem
+sudo su
+yum -y update
+
+
+
+5. 
+
