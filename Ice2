@@ -1,42 +1,57 @@
-import sys
-from awsglue.context import GlueContext
-from awsglue.job import Job
-from pyspark.context import SparkContext
+AWS Event Exercise Recap:
 
-# Initialize Spark and Glue contexts
-sc = SparkContext()
-glueContext = GlueContext(sc)
-spark = glueContext.spark_session
-job = Job(glueContext)
-job.init('ParquetToLakeFormationTableJob')
+The Unicorn rental UI application was preconfigured, and our task was to optimize the payload request/response time within a 4.5-second limit. Our goal was to establish an efficient AWS infrastructure with minimal response time and reduced infrastructure costs.
 
-# Specify source and target S3 paths
-source_path = 's3://your-source-bucket/source-path/'  # Replace with your actual source path
-database_name = 'your_database_name'  # Replace with your actual Lake Formation database name
-table_name = 'your_table_name'  # Replace with your desired Glue table name
-target_path = f's3://your-target-bucket/target-path/{table_name}/'  # Replace with your actual target path
+Initial Configuration:
 
-# Create a DynamicFrame for the source Parquet data
-source_dyf = glueContext.create_dynamic_frame.from_catalog(
-    database=database_name,
-    table_name='your_parquet_table'  # Replace with your actual Parquet table name
-)
+The web application, coded in Python, was hosted on EC2 instances, managed by a classic load balancer.
+The environment included three EC2 instances, and the load was distributed through the classic load balancer.
+The EC2 Launch template contained user data, executing Python code with a 60-second wait time. The Auto Scaling Group (ASG) linked to the template had a minimum of 2 and a maximum of 5 EC2 instances.
+The Python program simulated infrastructure failures based on URL input to assess system stability.
 
-# Convert DynamicFrame to Spark DataFrame
-source_df = source_dyf.toDF()
+Observations and Issues:
 
-# Write the Spark DataFrame to S3 in Parquet format
-source_df.write.mode('overwrite').parquet(target_path)
+NACL connection was stable.
+Classic load balancer directly pointed to EC2 instances.
+Two subnets were set up, with one supporting only the classic load balancer and both connected to an internet gateway.
+ASG was not attached to one EC2 instance.
+A security group disallowed input requests.
 
-# Create a DynamicFrame for the target Glue table using Glue DataBrew
-target_dyf = glueContext.create_dynamic_frame.from_catalog(
-    database=database_name,
-    table_name=table_name,
-    transformation_ctx='target_dyf'
-)
+Resolution Steps#1:
 
-# Print the schema of the target DynamicFrame (optional)
-target_dyf.printSchema()
+Corrected the Security Groups, which will allow the incoming request
+Converted the classic load balancer to an Application Load Balancer (ALB) and increased subnet ranges. Updated the EC2 Launch template and ASG.
+Configured dynamic policies in the ASG to initiate a new load based on CPU utilization exceeding 70%. Ensured security group settings for web application ports.
+Terminated existing EC2 instances, allowing ASG to initiate new ones.
+Verified ALB URL functionality and successfully tested payload requests.
 
-# Commit the job
-job.commit()
+Resolution Steps#2:
+(Cache - Performance improvement)
+Introduction of CloudFront and Redis:
+Implemented CloudFront for edge locations in North America and Europe to reduce infrastructure costs. Faced initial issues with payload failures.
+Contacted AWS for assistance; account restrictions on CloudFront options were corrected and this was due to limitation in that AWS Account
+(ASG-EC2 Performance improvement):
+
+Eliminated the 60-second delay in EC2 provisioning in the user data. 
+Configured dynamic policies in the ASG to initiate a new load based on CPU utilization exceeding 70%. Ensured security group settings for web application ports.
+Achieved a drastic reduction in payload response time to 3.5 to 4.5 seconds.
+
+Containerization with ECS:
+
+Containerized the application using Docker, pushed the image to Amazon ECR, and set up ECS with Fargate. Encountered a high rate of payload failures because of not able to handle the incoming request.
+AWS team changed the Python source code, causing widespread payload failures. 
+AWS team hinted on that changed version, so Updated EC2 template version and terminated instances for ASG to create new ones.
+Faced challenges with infrastructure costs, leading to the termination of the ECS Cluster.
+
+Final Adjustments:
+
+Increased subnets in different availability zones with different IP ranges. Adjusted the launch template and ASG settings.
+After increasing subnets, payload request/response scores improved from 2000 to 3000 points, moving the team from 7th to 3rd position. An accidental subnet removal caused a minor point decrease, securing the team in the 3rd position.
+
+Lesson learnt:
+
+Relying solely on CPU metrics for the auto-scaling of EC2 instances may not be sufficient; it is crucial to thoroughly analyze various factors. For instance, consider factors such as payload request/response based on input requests.
+
+Ensure your architecture is geared towards scalability and high availability by dispersing resources across multiple Availability Zones. Our emphasis on scalability and expanding availability zones in the final hour proved instrumental in constructing a robust infrastructure.
+
+Gain proficiency in designing subnet ranges that span multiple Availability Zones within a VPC CIDR range.
