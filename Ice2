@@ -1,2 +1,1 @@
-
-Choose Snowflake for its seamless integration with external cloud storage, multi-cluster, shared data architecture ensuring optimal performance, and the built-in Snowflake Data Sharing feature that facilitates controlled sharing of data at a granular level without duplication, promoting collaboration and analytics efficiency.
+Detailed control over Immuta features has been thoroughly investigated. The proof of concept for third-party data (a, b, c) has been successfully executed, demonstrating the implementation of fine-grained access control with Immuta on different cloud platforms, including Redshift and Snowflake, specifically with external tables. This presentation occurred across the C-FR Line of Business and was delivered at the EL
