@@ -1,18 +1,19 @@
-If you're asking about "Immuta over Snowflake native policy," it could refer to the integration of Immuta with Snowflake to enhance or extend Snowflake's native policy capabilities for data access control, security, and governance. Immuta often integrates with various data platforms, including Snowflake, to provide additional features such as fine-grained access control, masking, auditing, and policy enforcement.
-
-Selecting Snowflake for the described scenario provides several advantages:
-
-Data Accessibility Without Duplication:
-
-Snowflake's architecture allows for querying data directly from external stages (like an A3 bucket) without the need for data duplication onto the Snowflake platform. This aligns with the requirement of analyzing second-party data without unnecessary data movement.
-Efficient Data Linkage:
-
-Snowflake's data-sharing capabilities facilitate efficient linkage with the ABC data, enabling seamless access and analysis without the need to copy data into the ABC data lake.
-Fine-Grained Access Control:
-
-Snowflake offers robust security features, including fine-grained access control, which aligns with the requirement for implementing access control mechanisms for business users.
-Scalability and Performance:
-
-Snowflake's cloud-native architecture ensures scalability, allowing for the processing of large datasets, and provides high performance for analytical workloads.
-Potential Heading:
-"Choosing Snowflake for Seamless Analytics on Second-Party Data in ABC Risk: A Comprehensive Solution"
+SELECT
+  qh.query_id,
+  qh.warehouse_name,
+  qh.start_time,
+  qh.end_time,
+  qh.total_elapsed_time,
+  qh.credits_used
+FROM
+  TABLE(INFORMATION_SCHEMA.QUERY_HISTORY()) qh
+JOIN
+  TABLE(INFORMATION_SCHEMA.WAREHOUSE_METERING_HISTORY()) wh
+ON
+  qh.start_time >= wh.start_time
+  AND qh.end_time <= wh.end_time
+  AND qh.warehouse_name = wh.warehouse_name
+WHERE
+  qh.query_type = 'SELECT'
+  AND qh.start_time >= TIMESTAMP_LTZ('start_date_time')
+  AND qh.end_time <= TIMESTAMP_LTZ('end_date_time');
