@@ -3,6 +3,9 @@ import csv
 # Read input CSV file
 input_file = 'input.csv'
 
+# Output file path
+output_file_path = 'output/generated_terraform_code.tf'
+
 # Output Terraform code
 terraform_code = """\
 resource "tablename from excel" "external_table" {
@@ -11,7 +14,6 @@ resource "tablename from excel" "external_table" {
   location    = var.ext_stg_name
   comment     = "External table"
   file_format = "TYPE = PARQUET "
-
 """
 
 # Map Athena data types to Snowflake data types
@@ -47,7 +49,10 @@ with open(input_file, 'r') as csvfile:
             terraform_code += f'    as = (CAST(GET($1, \'{fieldname}\') as {datatype}))\n'
 
 # Complete the Terraform code
-terraform_code += '}'
+terraform_code += f'}}\n'
 
-# Print the generated Terraform code
-print(terraform_code)
+# Write the generated Terraform code to a file
+with open(output_file_path, 'w') as output_file:
+    output_file.write(terraform_code)
+
+print(f'Terraform code written to {output_file_path}')
