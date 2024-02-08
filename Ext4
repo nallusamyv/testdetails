@@ -1,14 +1,20 @@
 import csv
+import os
 
-# Read input CSV file
-input_file = 'input.csv'
+# Full path to the input CSV file
+input_file = r'C:\Users\nall\input.csv'
 
-# Output file path
-output_file_path = 'output/generated_terraform_code.tf'
+# Output directory path
+output_directory = 'output'
+output_file_path = os.path.join(output_directory, 'generated_terraform_code.tf')
+
+# Check if the output directory exists, and create it if needed
+if not os.path.exists(output_directory):
+    os.makedirs(output_directory)
 
 # Output Terraform code
 terraform_code = """\
-resource "tablename from excel" "external_table" {
+resource "tablename from excel" "{tablename}" {
   database    = var.external_db_name
   schema      = var.schema_val_name
   location    = var.ext_stg_name
@@ -30,7 +36,7 @@ data_type_mapping = {
 # Process each row in the CSV file
 with open(input_file, 'r') as csvfile:
     csv_reader = csv.DictReader(csvfile)
-    for row in csv_reader:
+    for i, row in enumerate(csv_reader):
         tablename = row['tablename']
         fieldname = row['fieldname']
         datatype = row['datatype']
@@ -51,8 +57,8 @@ with open(input_file, 'r') as csvfile:
 # Complete the Terraform code
 terraform_code += f'}}\n'
 
-# Write the generated Terraform code to a file
+# Write the generated Terraform code to a file with the tablename
 with open(output_file_path, 'w') as output_file:
-    output_file.write(terraform_code)
+    output_file.write(terraform_code.format(tablename=tablename))
 
-print(f'Terraform code written to {output_file_path}')
+print(f'Terraform code written to {output_file_path} for tablename: {tablename}')
