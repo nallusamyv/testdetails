@@ -1,27 +1,26 @@
-resource "snowflake_external_table" "table1" {
-  name     = "TABLE1"
-  database = "<YourDatabaseName>"
-  schema   = "<YourSchemaName>"
-  comment  = "Your comment here"
+Meeting Highlights:
 
-  file_format = "<YourFileFormatName>"
+CAS Request Process:
 
-  column {
-    name    = "TAX_ISS"
-    type    = "VARCHAR"
-    length  = 10
-    as_expr = "CAST(GET($1, 'TAX_ISS') AS VARCHAR(50))"
-  }
+Consensus reached on the practice of raising CAS requests with a top-level prefix for clarity and organization.
+Agreement that the initial production implementation of onboarding external tables to Snowflake involves 5 tables.
+Decision to elevate the CAS request to a higher level for broader visibility and approval.
+Onboarding External Tables to Snowflake:
 
-  column {
-    name    = "PARTITTION_DATE"
-    type    = "VARCHAR"
-    as_expr = "SPLIT_PART(METADATA$FILENAME, '/', 6)"
-  }
+[Your Name] provided an overview of the onboarding process, highlighting the inclusion of 5 tables in the initial production phase.
+Acknowledgment of the need for a higher-level CAS request for this implementation.
+Schema Naming Standards:
 
-  partition_column {
-    name = "PARTITTION_DATE"
-  }
+The Data Architect team will take the lead in establishing schema naming standards for the tables.
+[Data Architect Team Member 1] and [Data Architect Team Member 2] will share the finalized standards with the wider team.
+Action Items:
 
-  location = "@DEVSTAGE"
-}
+[Your Name] to initiate the higher-level CAS request for the onboarding of external tables.
+Data Architect team to finalize and communicate schema naming standards.
+Next Steps:
+
+Team members are encouraged to review and provide feedback on the proposed schema naming standards.
+Once feedback is collected, the Data Architect team will officially implement the schema naming standards.
+Adjournment:
+The meeting concluded with a shared understanding of the CAS request process, the onboarding plan for external tables, and the commitment to establishing consistent schema naming standards.
+
