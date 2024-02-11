@@ -1,13 +1,1 @@
-resource snowflake_view view {
-  database = "db"
-  schema   = "schema"
-  name     = "view"
-
-  comment = "comment"
-
-  statement  = <<-SQL
-    select * from foo;
-SQL
-  or_replace = false
-  is_secure  = false
-}
+Upon conducting a high-level review, it seems that the assigned role only grants read access to S3, Athena (without apparent StartQueryExecution access), DynamoDB, Redshift, and CloudWatch.  I would appreciate being included in the upcoming meeting to gain a better understanding.
