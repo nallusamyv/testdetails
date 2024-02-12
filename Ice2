@@ -1,1 +1,13 @@
-Upon conducting a high-level review, it seems that the assigned role only grants read access to S3, Athena (without apparent StartQueryExecution access), DynamoDB, Redshift, and CloudWatch.  I would appreciate being included in the upcoming meeting to gain a better understanding.
+try {
+  // Insert the SQL statement into the policy_statement table
+  var insertStatementSQL = "INSERT INTO policy_statement (policy_name, sql_statement) VALUES (?, ?)";
+  var insertStatementStatement = snowflake.createStatement({sqlText: insertStatementSQL, binds: [v_policy_name, v_sql]});
+  insertStatementStatement.execute();
+} catch (error) {
+  // Handle the error, you can log it or take appropriate action
+  var errorMessage = error.toString();
+  // Insert the error details into the function_result table
+  var insertErrorSQL = "INSERT INTO function_result (policy_name, error_message) VALUES (?, ?)";
+  var insertErrorStatement = snowflake.createStatement({sqlText: insertErrorSQL, binds: [v_policy_name, errorMessage]});
+  insertErrorStatement.execute();
+}
