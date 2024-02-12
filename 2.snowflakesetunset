@@ -1,0 +1,72 @@
+CREATE OR REPLACE PROCEDURE CREATE_MASKING_POLICIES(IN policy_action STRING)
+  RETURNS STRING
+  LANGUAGE SQL
+  EXECUTE AS CALLER
+AS
+$$
+DECLARE
+  v_policy_name STRING;
+  v_data_type STRING;
+  v_function_name STRING;
+  v_sql STRING;
+  v_table_name STRING;
+  v_field_name STRING;
+  v_db_name STRING;
+  v_schema_name STRING;
+
+  -- Temporary table to store created policies
+  CREATE TEMPORARY TABLE IF NOT EXISTS temp_created_policies (policy_name STRING);
+
+BEGIN
+  -- Loop through the NATIVE_ROLE_AD_MAPPING table
+  FOR row IN (SELECT * FROM DEV_11111_METADATA_DB.META_T.NATIVE_ROLE_AD_MAPPING)
+  DO
+    v_policy_name := row.SNOWFLAKEPOLICYNAME;
+    
+    -- Check if the policy has already been created
+    IF NOT EXISTS(SELECT * FROM temp_created_policies WHERE policy_name = v_policy_name) THEN
+      v_data_type := 
+        CASE 
+          WHEN row.DATATYPE IN ('INT', 'DECIMAL') THEN 'NUMBER'
+          WHEN row.DATATYPE = 'DATE' THEN 'TIMESTAMP_NTZ'
+          ELSE row.DATATYPE
+        END;
+      v_function_name := row.FUNCTIONNAME;
+      v_table_name := row.TABLENAME;
+      v_db_name := row.DBNAME;
+      v_schema_name := row.SCHEMANAME;
+
+      -- Dynamic SQL to create the masking policy
+      v_sql := 
+        'CREATE OR REPLACE MASKING POLICY ' || v_policy_name ||
+        ' AS (val ' || v_data_type || ') RETURNS VARIANT => ' ||
+        'CASE WHEN ' || v_function_name || ' THEN val ELSE NULL END;';
+
+      -- Execute the dynamic SQL
+      EXECUTE IMMEDIATE v_sql;
+
+      -- Insert the policy name into the temporary table to mark it as created
+      INSERT INTO temp_created_policies VALUES (v_policy_name);
+    END IF;
+
+    -- Apply or remove the masking policy on the table based on the policy_action parameter
+    IF policy_action = 'SET' THEN
+      EXECUTE IMMEDIATE 
+        'ALTER TABLE ' || v_db_name || '.' || v_schema_name || '.' || v_table_name || 
+        ' MODIFY COLUMN SET MASKING POLICY ' || v_policy_name;
+    ELSIF policy_action = 'UNSET' THEN
+      EXECUTE IMMEDIATE 
+        'ALTER TABLE ' || v_db_name || '.' || v_schema_name || '.' || v_table_name || 
+        ' MODIFY COLUMN UNSET MASKING POLICY;';
+    END IF;
+  END FOR;
+
+  -- Drop the temporary table
+  DROP TABLE IF EXISTS temp_created_policies;
+
+  RETURN 'Masking policies created and ' || policy_action || ' successfully';
+END;
+$$;
+
+-- Call the stored procedure to create and apply masking policies with the desired action
+CALL CREATE_MASKING_POLICIES('SET'); -- or CALL CREATE_MASKING_POLICIES('UNSET');
