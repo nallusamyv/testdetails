@@ -4,14 +4,49 @@ CREATE OR REPLACE PROCEDURE CREATE_MASKING_POLICIES()
   EXECUTE AS CALLER
 AS
 $$
-var v_policy_name, v_data_type, v_function_name, v_sql, v_table_name, v_field_name, v_db_name, v_schema_name;
+var v_policy_name, v_data_type, v_function_name, v_sql, v_table_name, v_field_name, v_db_name, v_schema_name, dropPolicySQL;
+
+// Drop the existing policy from all associated columns
+dropPolicySQL = `SELECT A.FIELD, B.DBNAME, B.SCHEMANAME, B.TABLENAME, B.SNOWFLAKEPOLICYNAME
+    FROM COLUMN_TO_LOB_PG_MAP A, NATIVE_ROLE_AD_MAPPING B
+    WHERE A.TABLENAME = B.TABLENAME
+      AND A.DATATYPE = B.DATATYPE
+      AND A.PROTECTIONGROUP = B.PROTECTIONGROUP`;
+
+var dropPolicyStatement = snowflake.createStatement({sqlText: dropPolicySQL});
+var dropPolicyResultSet = dropPolicyStatement.execute();
+
+while (dropPolicyResultSet.next()) {
+  v_field_name = dropPolicyResultSet.getColumnValue("FIELD");
+  v_db_name = dropPolicyResultSet.getColumnValue("DBNAME");
+  v_schema_name = dropPolicyResultSet.getColumnValue("SCHEMANAME");
+  v_table_name = dropPolicyResultSet.getColumnValue("TABLENAME");
+  v_existing_policy_name = dropPolicyResultSet.getColumnValue("SNOWFLAKEPOLICYNAME");
+
+  // Drop the existing masking policy from the column
+  var dropPolicyFromColumnSQL = 
+    'ALTER TABLE ' + v_db_name + '.' + v_schema_name + '.' + v_table_name +
+    ' MODIFY COLUMN ' + v_field_name + ' UNSET MASKING POLICY;';
+
+  try {
+    // Try executing the SQL statement
+    snowflake.execute({sqlText: dropPolicyFromColumnSQL});
+  } catch (e) {
+    // If an error occurs, log the details to the function_result table
+    var logErrorSQL = "INSERT INTO function_result (action, field_name, db_name, schema_name, table_name, error_message) " +
+                      "VALUES (?, ?, ?, ?, ?, ?)";
+    var logErrorStatement = snowflake.createStatement({sqlText: logErrorSQL, binds: ["Drop Policy", v_field_name, v_db_name, v_schema_name, v_table_name, e.toString()]});
+    logErrorStatement.execute();
+    continue; // Continue with the next iteration
+  }
+}
 
 // Temporary table to store created policies
 var createTempTableSQL = "CREATE TEMPORARY TABLE IF NOT EXISTS temp_created_policies (policy_name STRING)";
 snowflake.execute({sqlText: createTempTableSQL});
 
 // Loop through the NATIVE_ROLE_AD_MAPPING table
-var mappingResultSet = snowflake.execute({sqlText: "SELECT * FROM DEV_11111_METADATA_DB.META_T.NATIVE_ROLE_AD_MAPPING"});
+var mappingResultSet = snowflake.execute({sqlText: "SELECT * FROM NATIVE_ROLE_AD_MAPPING"});
 while (mappingResultSet.next()) {
   v_policy_name = mappingResultSet.getColumnValue("SNOWFLAKEPOLICYNAME");
 
@@ -20,33 +55,44 @@ while (mappingResultSet.next()) {
   var policyCheckStatement = snowflake.createStatement({sqlText: policyCheckSQL, binds: [v_policy_name]});
   var policyCheckResultSet = policyCheckStatement.execute();
   if (!policyCheckResultSet.next()) {
-    v_data_type = (mappingResultSet.getColumnValue("DATATYPE") === 'INT' || mappingResultSet.getColumnValue("DATATYPE") === 'DECIMAL') ? 'NUMBER' :
-                  (mappingResultSet.getColumnValue("DATATYPE") === 'DATE') ? 'TIMESTAMP_NTZ' : mappingResultSet.getColumnValue("DATATYPE");
-    v_function_name = mappingResultSet.getColumnValue("FUNCTIONNAME");
+    v_data_type = mappingResultSet.getColumnValue("DATATYPE");
+    v_function_name = mappingResultSet.getColumnValue("FUNCTIONNAME") + '()';
     v_table_name = mappingResultSet.getColumnValue("TABLENAME");
     v_db_name = mappingResultSet.getColumnValue("DBNAME");
     v_schema_name = mappingResultSet.getColumnValue("SCHEMANAME");
 
     // Dynamic SQL to create the masking policy
-    v_sql = "CREATE OR REPLACE MASKING POLICY " + v_policy_name +
-            " AS (val " + v_data_type + ") RETURNS VARIANT => " +
-            "CASE WHEN " + v_function_name + " THEN val ELSE NULL END;";
+    v_sql = `
+      CREATE OR REPLACE MASKING POLICY ${v_policy_name}
+      AS (val ${v_data_type}) 
+      RETURNS ${v_data_type} ->  
+      CASE WHEN ${v_function_name} THEN val ELSE NULL END;`;
 
-    // Execute the dynamic SQL
-    snowflake.execute({sqlText: v_sql});
-
-    // Insert the policy name into the temporary table to mark it as created
-    var insertPolicySQL = "INSERT INTO temp_created_policies VALUES (?)";
-    var insertPolicyStatement = snowflake.createStatement({sqlText: insertPolicySQL, binds: [v_policy_name]});
-    insertPolicyStatement.execute();
+    try {
+      // Try executing the SQL statement
+      snowflake.execute({sqlText: v_sql});
+    } catch (e) {
+      // If an error occurs, log the details to the function_result table
+      var logErrorSQL = "INSERT INTO function_result (action, policy_name, db_name, schema_name, table_name, error_message) " +
+                        "VALUES (?, ?, ?, ?, ?, ?)";
+      var logErrorStatement = snowflake.createStatement({sqlText: logErrorSQL, binds: ["Create Policy", v_policy_name, v_db_name, v_schema_name, v_table_name, e.toString()]});
+      logErrorStatement.execute();
+      continue; // Continue with the next iteration
+    }
   }
 
-  // Apply the masking policy to the table and all fields in COLUMN_TO_LOB_PG_MAP with the same policy name
-  var applyPolicySQL = "SELECT FIELD, DBNAME, SCHEMANAME, TABLENAME " +
-                       "FROM DEV_11111_METADATA_DB.META_T.COLUMN_TO_LOB_PG_MAP " +
-                       "WHERE SNOWFLAKEPOLICYNAME = ?";
+  // Loop through the COLUMN_TO_LOB_PG_MAP and NATIVE_ROLE_AD_MAPPING tables
+  var applyPolicySQL = `
+    SELECT A.FIELD, B.DBNAME, B.SCHEMANAME, B.TABLENAME
+    FROM COLUMN_TO_LOB_PG_MAP A, NATIVE_ROLE_AD_MAPPING B
+    WHERE A.TABLENAME = B.TABLENAME
+      AND A.DATATYPE = B.DATATYPE
+      AND A.PROTECTIONGROUP = B.PROTECTIONGROUP
+      AND B.SNOWFLAKEPOLICYNAME = ?`;
+
   var applyPolicyStatement = snowflake.createStatement({sqlText: applyPolicySQL, binds: [v_policy_name]});
   var applyPolicyResultSet = applyPolicyStatement.execute();
+
   while (applyPolicyResultSet.next()) {
     v_field_name = applyPolicyResultSet.getColumnValue("FIELD");
     v_db_name = applyPolicyResultSet.getColumnValue("DBNAME");
@@ -54,9 +100,20 @@ while (mappingResultSet.next()) {
     v_table_name = applyPolicyResultSet.getColumnValue("TABLENAME");
 
     // Apply the masking policy to the field
-    var alterTableSQL = "ALTER TABLE " + v_db_name + "." + v_schema_name + "." + v_table_name +
-                        " MODIFY COLUMN " + v_field_name + " SET MASKING POLICY " + v_policy_name;
-    snowflake.execute({sqlText: alterTableSQL});
+    var alterTableSQL = `ALTER TABLE ${v_db_name}.${v_schema_name}.${v_table_name} 
+      MODIFY COLUMN ${v_field_name} SET MASKING POLICY ${v_policy_name}`;
+
+    try {
+      // Try executing the SQL statement
+      snowflake.execute({sqlText: alterTableSQL});
+    } catch (e) {
+      // If an error occurs, log the details to the function_result table
+      var logErrorSQL = "INSERT INTO function_result (action, field_name, db_name, schema_name, table_name, error_message) " +
+                        "VALUES (?, ?, ?, ?, ?, ?)";
+      var logErrorStatement = snowflake.createStatement({sqlText: logErrorSQL, binds: ["Apply Policy", v_field_name, v_db_name, v_schema_name, v_table_name, e.toString()]});
+      logErrorStatement.execute();
+      continue; // Continue with the next iteration
+    }
   }
 }
 
