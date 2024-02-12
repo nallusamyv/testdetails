@@ -1,0 +1,31 @@
+-- Step 1: Create a Role
+CREATE ROLE global_policy_role;
+
+-- Step 2: Grant Minimum Privileges to the Role
+GRANT USAGE, CREATE SCHEMA ON DATABASE your_database TO ROLE global_policy_role;
+
+-- Step 3: Create a Trigger to Enforce the Policy
+CREATE OR REPLACE TRIGGER enforce_global_policy
+AFTER CREATE ON DATABASE.your_database.your_schema
+FOR EACH STATEMENT
+EXECUTE AS CALLER
+AS
+$$
+DECLARE
+  v_table_name VARCHAR;
+BEGIN
+  -- Check for new tables
+  FOR tables IN (SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'your_schema') DO
+    v_table_name := tables.TABLE_NAME;
+
+    -- Enforce policy on new tables
+    EXECUTE IMMEDIATE 'REVOKE ALL PRIVILEGES ON TABLE your_schema.' || v_table_name || ' FROM ROLE global_policy_role';
+  END FOR;
+END;
+$$;
+
+-- Step 4: Enable the Trigger
+ALTER TRIGGER enforce_global_policy ENABLE;
+
+-- Step 5: Test the Policy
+-- When a new table is added to your_schema, it will automatically have all privileges revoked for global_policy_role
