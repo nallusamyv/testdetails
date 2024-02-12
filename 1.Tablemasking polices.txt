@@ -1,0 +1,169 @@
+CREATE SEQUENCE AD_SEQ START = 1 INCREMENT = 1;
+CREATE SEQUENCE LOB_COL_SEQ START = 1 INCREMENT = 1;
+CREATE SEQUENCE NATROLE_AD_SEQ START = 1 INCREMENT = 1;
+
+
+CREATE OR REPLACE TABLE AD_MAPPING(AD_SEQ_NO NUMBER DEFAULT AD_SEQ.NEXTVAL,
+                        UserId VARCHAR(10),
+                        RBAC_Role VARCHAR(50),Platform VARCHAR(10)) CLUSTER BY (RBAC_Role);
+
+INSERT INTO AD_MAPPING(Userid, RBAC_Role, Platform) 
+values ('CHINNAMMAL','ABC_POLICY_TAS_BCS_GOVTID','TAS'),
+('CHINNAMMAL','ABC_POLICY_TAS_BCS-PORT_HIGHPI','TAS')
+
+
+create or replace TABLE DEV_11111_METADATA_DB.META_T.COLUMN_TO_LOB_PG_MAP (
+    LOB_COL_SEQ_NO NUMBER DEFAULT LOB_COL_SEQ.NEXTVAL,
+	TABLENAME VARCHAR(100),
+	FIELD VARCHAR(50),
+	DATATYPE VARCHAR(50),
+	PROTECTIONGROUP VARCHAR(10)
+);
+
+INSERT INTO DEV_11111_METADATA_DB.META_T.COLUMN_TO_LOB_PG_MAP
+ (TABLENAME,
+	FIELD ,
+	DATATYPE,
+	PROTECTIONGROUP)
+VALUES 
+('EMP_I','TX_ID','NUMBER','GOVTID'),
+('EMP_I','FIR_NAME','VARCHAR','INTL'),
+('EMP_I','LAS_NAME','VARCHAR','HIGHPI'),
+('EMP_I','UPDT_DT','DATE','INTL'),
+('CRI_M','TX_ID','NUMBER','GOVTID'),
+('CRI_M','FIR_NAM','VARCHAR','INTL'),
+('CRI_M','LAS_NAM','VARCHAR','HIGHPI'),
+('CRI_M','CRET_DT','DATE','INTL')
+
+
+create or replace TABLE DEV_11111_METADATA_DB.META_T.NATIVE_ROLE_AD_MAPPING (
+	NATROLE_AD_SEQ_NO NUMBER(38,0) DEFAULT DEV_11111_METADATA_DB.META_T.NATROLE_AD_SEQ.NEXTVAL,
+	PLATFORM VARCHAR(10),
+	SUBLOB VARCHAR(10),
+	PROTECTIONGROUP VARCHAR(10),
+	DATATYPE VARCHAR(20),
+	RBAC_ROLE VARCHAR(100),
+    FUNCTIONNAME VARCHAR(100),
+	SNOWFLAKEPOLICYNAME VARCHAR(100),
+    DBNAME VARCHAR(50),
+    SCHEMANAME VARCHAR(50),
+	TABLENAME VARCHAR(50)
+);
+
+INSERT INTO NATIVE_ROLE_AD_MAPPING(Platform ,
+                                    SubLob	,
+                                    ProtectionGroup ,
+                                    datatype ,
+                                    RBAC_Role , FUNCTIONNAME, SNOWFLAKEPOLICYNAME, DBNAME, SCHEMANAME, TABLENAME)
+values ('TAS','BCS','GOVTID','NUMBER','USR_RBAC_XXXX_GOVTID','ABC_POLICY_TAS_BCS_GOVTID','ABC_POLICY_TAS_BCS_GOVTID_NUMBER','DEV_11111_EXT_DB','ICCW_T','EMP_I'),
+('TAS','BCS','INTL','VARCHAR','USR_RBAC_XXXX_INTL','ABC_POLICY_TAS_BCS_INTL','ABC_POLICY_TAS_BCS_INTL_VARCHAR','DEV_11111_EXT_DB','ICCW_T','EMP_I'),
+('TAS','BCS','HIGHPI','VARCHAR','USR_RBAC_XXXX_HIGHPI','ABC_POLICY_TAS_BCS_HIGHPI','ABC_POLICY_TAS_BCS_HIGHPI_VARCHAR','DEV_11111_EXT_DB','ICCW_T','EMP_I'),
+('TAS','BCS','INTL','DATE','USR_RBAC_XXXX_INTL','ABC_POLICY_TAS_BCS_INTL','ABC_POLICY_TAS_BCS_INTL_DATE','DEV_11111_EXT_DB','ICCW_T','EMP_I'),
+('TAS','BCS_PORT','GOVTID','NUMBER','USR_RBAC_YYYY_GOVTID','ABC_POLICY_TAS_BCS_PORT_GOVTID','ABC_POLICY_TAS_BCS_PORT_GOVTID_NUMBER','DEV_11111_EXT_DB','ICCW_T','CRI_M'),
+('TAS','BCS_PORT','INTL','VARCHAR','USR_RBAC_YYYY_INTL','ABC_POLICY_TAS_BCS_PORT_INTL','ABC_POLICY_TAS_BCS_PORT_INTL_VARCHAR','DEV_11111_EXT_DB','ICCW_T','CRI_M'),
+('TAS','BCS_PORT','HIGHPI','VARCHAR','USR_RBAC_YYYY_HIGHPI','ABC_POLICY_TAS_BCS_PORT_HIGHPI','ABC_POLICY_TAS_BCS_PORT_HIGHPI_VARCHAR','DEV_11111_EXT_DB','ICCW_T','CRI_M'),
+('TAS','BCS_PORT','INTL','DATE','USR_RBAC_YYYY_INTL','ABC_POLICY_TAS_BCS_PORT_INTL','ABC_POLICY_TAS_BCS_PORT_INTL_DATE','DEV_11111_EXT_DB','ICCW_T','CRI_M')
+
+
+THESE ARE ALL THE TABLE. Next step is need to create a masking policy and attach to the table.
+The maskingpolicyname, functionname, datatype is extracted from DEV_11111_METADATA_DB.META_T.NATIVE_ROLE_AD_MAPPING table and
+based on the DATATYPE field 
+
+
+Based on the above information form the masking policy:
+11111 - Is the maskingpolicyname 
+22222 - Datatype from that table (If datatype int or decimal then 22222 will be NUMBER, if data type is date then 22222 will be TIMESTAMP_NTZ)
+33333 - functionname
+
+CREATE OR REPLACE MASKING POLICY 11111 
+  AS (val 222222) RETURNS VARIANT =>
+  CASE
+    WHEN 33333333 THEN val
+    ELSE NULL
+  END;
+
+Once this masking policy is created then apply the policy based on this to the tables. 
+Link with DEV_11111_METADATA_DB.META_T.COLUMN_TO_LOB_PG_MAP table based on TABLENAME and apply the policy to the fields based on FIELD, DATATYPE in the table.
+and dbname,schemaname taekn from NATIVE_ROLE_AD_MAPPING TABLE. 
+
+
+Please give me the SP to perform the above
+CREATE OR REPLACE PROCEDURE CREATE_MASKING_POLICIES()
+  RETURNS STRING
+  LANGUAGE SQL
+  EXECUTE AS CALLER
+AS
+$$
+DECLARE
+  v_policy_name STRING;
+  v_data_type STRING;
+  v_function_name STRING;
+  v_sql STRING;
+  v_table_name STRING;
+  v_field_name STRING;
+  v_db_name STRING;
+  v_schema_name STRING;
+
+  -- Temporary table to store created policies
+  CREATE TEMPORARY TABLE IF NOT EXISTS temp_created_policies (policy_name STRING);
+
+BEGIN
+  -- Loop through the NATIVE_ROLE_AD_MAPPING table
+  FOR row IN (SELECT * FROM DEV_11111_METADATA_DB.META_T.NATIVE_ROLE_AD_MAPPING)
+  DO
+    v_policy_name := row.SNOWFLAKEPOLICYNAME;
+    
+    -- Check if the policy has already been created
+    IF NOT EXISTS(SELECT * FROM temp_created_policies WHERE policy_name = v_policy_name) THEN
+      v_data_type := 
+        CASE 
+          WHEN row.DATATYPE IN ('INT', 'DECIMAL') THEN 'NUMBER'
+          WHEN row.DATATYPE = 'DATE' THEN 'TIMESTAMP_NTZ'
+          ELSE row.DATATYPE
+        END;
+      v_function_name := row.FUNCTIONNAME;
+      v_table_name := row.TABLENAME;
+      v_db_name := row.DBNAME;
+      v_schema_name := row.SCHEMANAME;
+
+      -- Dynamic SQL to create the masking policy
+      v_sql := 
+        'CREATE OR REPLACE MASKING POLICY ' || v_policy_name ||
+        ' AS (val ' || v_data_type || ') RETURNS VARIANT => ' ||
+        'CASE WHEN ' || v_function_name || ' THEN val ELSE NULL END;';
+
+      -- Execute the dynamic SQL
+      EXECUTE IMMEDIATE v_sql;
+
+      -- Insert the policy name into the temporary table to mark it as created
+      INSERT INTO temp_created_policies VALUES (v_policy_name);
+    END IF;
+
+    -- Apply the masking policy to the table and all fields in COLUMN_TO_LOB_PG_MAP with the same policy name
+    FOR field_row IN (
+      SELECT FIELD, DBNAME, SCHEMANAME, TABLENAME
+      FROM DEV_11111_METADATA_DB.META_T.COLUMN_TO_LOB_PG_MAP
+      WHERE SNOWFLAKEPOLICYNAME = v_policy_name
+    )
+    DO
+      v_field_name := field_row.FIELD;
+      v_db_name := field_row.DBNAME;
+      v_schema_name := field_row.SCHEMANAME;
+      v_table_name := field_row.TABLENAME;
+
+      -- Apply the masking policy to the field
+      EXECUTE IMMEDIATE 
+        'ALTER TABLE ' || v_db_name || '.' || v_schema_name || '.' || v_table_name || 
+        ' MODIFY COLUMN ' || v_field_name || ' SET MASKING POLICY ' || v_policy_name;
+    END FOR;
+  END FOR;
+
+  -- Drop the temporary table
+  DROP TABLE IF EXISTS temp_created_policies;
+
+  RETURN 'Masking policies created and applied successfully';
+END;
+$$;
+
+-- Call the stored procedure to create and apply masking policies
+CALL CREATE_MASKING_POLICIES();

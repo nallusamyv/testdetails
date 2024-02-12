@@ -1,0 +1,65 @@
+CREATE OR REPLACE PROCEDURE GENERATE_FUNCTIONS()
+    RETURNS STRING
+    LANGUAGE JAVASCRIPT
+    EXECUTE AS CALLER
+AS
+$$
+try {
+    // Define variables
+    var sql_commands = [];
+
+    // Iterate over COLUMN_TO_LOB_PG_MAP
+    var column_to_lob_pg_map_query = "SELECT * FROM DEV_11111_METADATA_DB.META_T.COLUMN_TO_LOB_PG_MAP";
+    var column_to_lob_pg_map_result = snowflake.execute({sqlText: column_to_lob_pg_map_query});
+
+    while (column_to_lob_pg_map_result.next()) {
+        var table_name = column_to_lob_pg_map_result.getColumnValue("TABLENAME");
+        var field_name = column_to_lob_pg_map_result.getColumnValue("FIELD");
+        var data_type = column_to_lob_pg_map_result.getColumnValue("DATATYPE");
+        var protection_group = column_to_lob_pg_map_result.getColumnValue("PROTECTIONGROUP");
+
+        // Query NATIVE_ROLE_AD_MAPPING to get RBAC_ROLE
+        var rbac_role_query = "SELECT DISTINCT RBAC_ROLE, FUNCTIONNAME, DBNAME, SCHEMANAME FROM DEV_11111_METADATA_DB.META_T.NATIVE_ROLE_AD_MAPPING " +
+                              "WHERE TABLENAME = '" + table_name + "' " +
+                              "AND PROTECTIONGROUP = '" + protection_group + "' " +
+                              "AND DATATYPE = '" + data_type + "'";
+        var rbac_role_result = snowflake.execute({sqlText: rbac_role_query});
+
+        while (rbac_role_result.next()) {
+            var rbac_role = rbac_role_result.getColumnValue("RBAC_ROLE");
+            var database_name = rbac_role_result.getColumnValue("DBNAME");
+            var schema_name = rbac_role_result.getColumnValue("SCHEMANAME");
+             
+        // Generate function name and create function
+            var function_name = rbac_role_result.getColumnValue("FUNCTIONNAME");
+            var create_function_sql = `
+                CREATE OR REPLACE FUNCTION ${function_name}() RETURNS BOOLEAN MEMOIZABLE AS /$/$
+                SELECT EXISTS(
+                    SELECT 1
+                    FROM DEV_11111_METADATA_DB.META_T.AD_MAPPING
+                    WHERE UserId = CURRENT_USER()
+                    AND RBAC_Role = '${rbac_role}'
+                ) /$/$`;
+
+                 // Replace /$/ with empty string in the SQL command
+            create_temp_sql = create_function_sql.replace(/\/\$/g, "$");
+            create_function_sql = create_temp_sql.replace(/\/\$/g, "$");
+
+            // Accumulate the SQL command
+            sql_commands.push(create_function_sql);     
+                
+        }
+    }
+    sql_commands.forEach(function(sql_command) {
+        snowflake.execute({sqlText: sql_command});
+    }); 
+    return 'Successful execution';
+} catch (err) {
+    return "Error: " + err;
+}
+$$;
+
+
+
+
+
