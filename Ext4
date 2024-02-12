@@ -1,64 +1,68 @@
-import csv
-import os
+CREATE OR REPLACE PROCEDURE CREATE_MASKING_POLICIES()
+  RETURNS STRING
+  LANGUAGE JAVASCRIPT
+  EXECUTE AS CALLER
+AS
+$$
+var v_policy_name, v_data_type, v_function_name, v_sql, v_table_name, v_field_name, v_db_name, v_schema_name;
 
-# Full path to the input CSV file
-input_file = r'C:\Users\nall\input.csv'
+// Temporary table to store created policies
+var createTempTableSQL = "CREATE TEMPORARY TABLE IF NOT EXISTS temp_created_policies (policy_name STRING)";
+snowflake.execute({sqlText: createTempTableSQL});
 
-# Output directory path
-output_directory = 'output'
-output_file_path = os.path.join(output_directory, 'generated_terraform_code.tf')
+// Loop through the NATIVE_ROLE_AD_MAPPING table
+var mappingResultSet = snowflake.execute({sqlText: "SELECT * FROM DEV_11111_METADATA_DB.META_T.NATIVE_ROLE_AD_MAPPING"});
+while (mappingResultSet.next()) {
+  v_policy_name = mappingResultSet.getColumnValue("SNOWFLAKEPOLICYNAME");
 
-# Check if the output directory exists, and create it if needed
-if not os.path.exists(output_directory):
-    os.makedirs(output_directory)
+  // Check if the policy has already been created
+  var policyCheckSQL = "SELECT * FROM temp_created_policies WHERE policy_name = ?";
+  var policyCheckStatement = snowflake.createStatement({sqlText: policyCheckSQL, binds: [v_policy_name]});
+  var policyCheckResultSet = policyCheckStatement.execute();
+  if (!policyCheckResultSet.next()) {
+    v_data_type = (mappingResultSet.getColumnValue("DATATYPE") === 'INT' || mappingResultSet.getColumnValue("DATATYPE") === 'DECIMAL') ? 'NUMBER' :
+                  (mappingResultSet.getColumnValue("DATATYPE") === 'DATE') ? 'TIMESTAMP_NTZ' : mappingResultSet.getColumnValue("DATATYPE");
+    v_function_name = mappingResultSet.getColumnValue("FUNCTIONNAME");
+    v_table_name = mappingResultSet.getColumnValue("TABLENAME");
+    v_db_name = mappingResultSet.getColumnValue("DBNAME");
+    v_schema_name = mappingResultSet.getColumnValue("SCHEMANAME");
 
-# Output Terraform code
-terraform_code = """\
-resource "tablename from excel" "{tablename}" {
-  database    = var.external_db_name
-  schema      = var.schema_val_name
-  location    = var.ext_stg_name
-  comment     = "External table"
-  file_format = "TYPE = PARQUET "
-"""
+    // Dynamic SQL to create the masking policy
+    v_sql = "CREATE OR REPLACE MASKING POLICY " + v_policy_name +
+            " AS (val " + v_data_type + ") RETURNS VARIANT => " +
+            "CASE WHEN " + v_function_name + " THEN val ELSE NULL END;";
 
-# Map Athena data types to Snowflake data types
-data_type_mapping = {
-    'INT': 'NUMBER',
-    'SMALLINT': 'NUMBER',
-    'BIGINT': 'NUMBER',
-    'TINYINT': 'NUMBER',
-    'INTEGER': 'NUMBER',
-    'DECIMAL': 'NUMBER',
-    'DOUBLE': 'NUMBER',
+    // Execute the dynamic SQL
+    snowflake.execute({sqlText: v_sql});
+
+    // Insert the policy name into the temporary table to mark it as created
+    var insertPolicySQL = "INSERT INTO temp_created_policies VALUES (?)";
+    var insertPolicyStatement = snowflake.createStatement({sqlText: insertPolicySQL, binds: [v_policy_name]});
+    insertPolicyStatement.execute();
+  }
+
+  // Apply the masking policy to the table and all fields in COLUMN_TO_LOB_PG_MAP with the same policy name
+  var applyPolicySQL = "SELECT FIELD, DBNAME, SCHEMANAME, TABLENAME " +
+                       "FROM DEV_11111_METADATA_DB.META_T.COLUMN_TO_LOB_PG_MAP " +
+                       "WHERE SNOWFLAKEPOLICYNAME = ?";
+  var applyPolicyStatement = snowflake.createStatement({sqlText: applyPolicySQL, binds: [v_policy_name]});
+  var applyPolicyResultSet = applyPolicyStatement.execute();
+  while (applyPolicyResultSet.next()) {
+    v_field_name = applyPolicyResultSet.getColumnValue("FIELD");
+    v_db_name = applyPolicyResultSet.getColumnValue("DBNAME");
+    v_schema_name = applyPolicyResultSet.getColumnValue("SCHEMANAME");
+    v_table_name = applyPolicyResultSet.getColumnValue("TABLENAME");
+
+    // Apply the masking policy to the field
+    var alterTableSQL = "ALTER TABLE " + v_db_name + "." + v_schema_name + "." + v_table_name +
+                        " MODIFY COLUMN " + v_field_name + " SET MASKING POLICY " + v_policy_name;
+    snowflake.execute({sqlText: alterTableSQL});
+  }
 }
 
-# Process each row in the CSV file
-with open(input_file, 'r') as csvfile:
-    csv_reader = csv.DictReader(csvfile)
-    for i, row in enumerate(csv_reader):
-        tablename = row['tablename']
-        fieldname = row['fieldname']
-        datatype = row['datatype']
-        partition = row['partition'] if 'partition' in row else None
+// Drop the temporary table
+var dropTempTableSQL = "DROP TABLE IF EXISTS temp_created_policies";
+snowflake.execute({sqlText: dropTempTableSQL});
 
-        # Map Athena data type to Snowflake data type
-        snowflake_data_type = data_type_mapping.get(datatype, datatype)
-
-        # Generate Terraform code for each column
-        terraform_code += f'\n  column {{\n    name = "{fieldname}"\n    type = "{snowflake_data_type}"\n'
-
-        # Add "as" clause for partition column
-        if partition:
-            terraform_code += f'    as = ({partition} as string))\n'
-        else:
-            terraform_code += f'    as = (CAST(GET($1, \'{fieldname}\') as {datatype}))\n'
-
-# Complete the Terraform code
-terraform_code += f'}}\n'
-
-# Write the generated Terraform code to a file with the tablename
-with open(output_file_path, 'w') as output_file:
-    output_file.write(terraform_code.format(tablename=tablename))
-
-print(f'Terraform code written to {output_file_path} for tablename: {tablename}')
+return 'Masking policies created and applied successfully';
+$$;
