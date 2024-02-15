@@ -1,7 +1,5 @@
-Previously, we had successfully raised a ticket to create multiple external databases, and the S Team graciously assisted in the process. However, our current situation presents a challenge as we are unable to obtain API access and the Hassium Admin is unavailable for our application. Despite our efforts, the required Hassium group remains unavailable.
-
-With a looming delivery deadline approaching rapidly, we find ourselves in a critical situation where timely action is imperative to avoid project delays. In light of this, we kindly request the assistance of the SRE team in creating the database ENV_SAP_LOB_EXT_DB.
-
-Your support in this matter is highly appreciated, and it will greatly contribute to ensuring the seamless progression of our project within the specified timelines.
-
-Thank you for your attention to this urgent request. Should you require any further information or clarification, please don't hesitate to reach out.
+match = re.match(r'^(\w+)(?:\((.*?)\))?$', datatype.strip())
+if match:
+    datatype_parts = match.groups()
+else:
+    raise ValueError(f"Invalid data type: {datatype}")
