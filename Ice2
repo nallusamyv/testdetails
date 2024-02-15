@@ -55,7 +55,11 @@ def generate_column_definition(row):
         raise ValueError(f"Missing field in row: {row}")
     if any(c.isspace() for c in table_name.strip()) or any(c.isspace() for c in field_name.strip()) or any(c.isspace() for c in data_type.strip()):
         raise ValueError(f"Field with spaces detected in row: {row}")
+
+    # Generate Snowflake data type for the current column
     datatype_sf = convert_datatype(data_type.strip())
+
+    # Generate Terraform script for the current column
     return f'''
   column {{
     name = "{field_name.strip().lower()}"
@@ -84,7 +88,6 @@ def generate_partition_columns(partition_date, context_id):
 '''
     return partition_columns
 
-
 def generate_terraform_script(input_file, output_folder, error_log_file, partition_date=False, context_id=False):
     try:
         if os.path.exists(output_folder):
@@ -106,7 +109,7 @@ resource "snowflake_external_table" "{table_name}" {{
   comment     = "External table"
   file_format = "TYPE = PARQUET"
 '''
-                terraform_script += generate_column_definition(row)
+                terraform_script += ''.join(generate_column_definition(row) for row in rows)  # Include all columns
 
                 partition_columns = generate_partition_columns(partition_date, context_id)
                 if partition_columns:
@@ -139,11 +142,11 @@ resource "snowflake_external_table" "{table_name}" {{
             error_file.write(f"Error: {str(e)}\n")
 
 # Example usage
-input_file = "C:/Users/sures/Downloads/terraform/input/table_details.csv"  # Replace with your input file name
-output_folder = "C:/Users/sures/Downloads/terraform/output"  # Output folder path
-error_log_file = "C:/Users/sures/Downloads/terraform/output/error.txt"  # Replace with your error log file name
-partition_date = True  # Set to True if partition_date is specified
-context_id = True  # Set to True if context_id is specified
+input_file = "C:/Users/sures/Downloads/terraform/input/table_details.csv"
+output_folder = "C:/Users/sures/Downloads/terraform/output"
+error_log_file = "C:/Users/sures/Downloads/terraform/output/error.txt"
+partition_date = True
+context_id = True
 
 try:
     generate_terraform_script(input_file, output_folder, error_log_file, partition_date, context_id)
