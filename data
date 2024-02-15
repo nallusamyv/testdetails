@@ -1,5 +1,7 @@
-match = re.match(r'^(\w+)(?:\((.*?)\))?$', datatype.strip())
-if match:
-    datatype_parts = match.groups()
-else:
-    raise ValueError(f"Invalid data type: {datatype}")
+   return f'''
+  column {{
+    name = "{field_name.strip().lower()}"
+    type = "{datatype_sf}"
+    as   = "(CAST (GET($1, '{field_name.strip().lower()}') AS {datatype_sf}))"
+  }}
+'''
