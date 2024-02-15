@@ -1,19 +1,7 @@
-https://github.com/developer-advocacy-dremio/quick-guides-from-dremio/tree/main
+Previously, we had successfully raised a ticket to create multiple external databases, and the S Team graciously assisted in the process. However, our current situation presents a challenge as we are unable to obtain API access and the Hassium Admin is unavailable for our application. Despite our efforts, the required Hassium group remains unavailable.
 
-# Check if the Iceberg table exists
-if not spark._jsparkSession.catalog().tableExists(iceberg_output_path):
-    # If the table does not exist, create it
-    df.write.format("iceberg").mode("overwrite").option("uri", iceberg_output_path).saveAsTable("default.my_iceberg_table")
-else:
-    # If the table exists, append data to it
-    df.write.format("iceberg").mode("append").option("uri", iceberg_output_path).saveAsTable("default.my_iceberg_table")
+With a looming delivery deadline approaching rapidly, we find ourselves in a critical situation where timely action is imperative to avoid project delays. In light of this, we kindly request the assistance of the SRE team in creating the database ENV_SAP_LOB_EXT_DB.
 
-glueContext.write_dynamic_frame.from_catalog(
-    frame=dynamic_frame,
-    catalog_database=None,  # No need to specify a database
-    catalog_table_name=None,  # No need to specify a table name
-    connection_options={"write.location": iceberg_output_path},  # Specify the Iceberg output path
-    format="iceberg",
-    format_options={"write.operation": "overwrite"},
-    transformation_ctx="datasink0"
-)
+Your support in this matter is highly appreciated, and it will greatly contribute to ensuring the seamless progression of our project within the specified timelines.
+
+Thank you for your attention to this urgent request. Should you require any further information or clarification, please don't hesitate to reach out.
