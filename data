@@ -1,7 +1,69 @@
-   return f'''
-  column {{
-    name = "{field_name.strip().lower()}"
-    type = "{datatype_sf}"
-    as   = "(CAST (GET($1, '{field_name.strip().lower()}') AS {datatype_sf}))"
-  }}
+
+shanthini g
+1:07 PM (0 minutes ago)
+to me
+
+def generate_terraform_script(input_file, output_folder, error_log_file, partition_date=False, context_id=False):
+    try:
+        if os.path.exists(output_folder):
+            shutil.rmtree(output_folder)  # Remove the output folder and its contents
+
+        os.makedirs(output_folder)  # Recreate the output folder
+
+        rows = read_input_csv(input_file)
+        error_count = 0
+       
+        # Group columns by table name
+        table_columns = {}
+        for row in rows:
+            table_name = row[0].strip().lower()
+            if table_name not in table_columns:
+                table_columns[table_name] = []
+            table_columns[table_name].append(row)
+
+        for table_name, columns in table_columns.items():
+            try:
+                terraform_script = f'''
+resource "snowflake_external_table" "{table_name}" {{
+  database    = var.database_name
+  schema      = var.schema_name
+  name        = "{table_name}"
+  location    = var.s3filename
+  comment     = "External table"
+  file_format = "TYPE = PARQUET"
 '''
+                column_definitions = ""
+                for column in columns:
+                    column_definitions += generate_column_definition(column)
+
+                terraform_script += column_definitions
+
+                partition_columns = generate_partition_columns(partition_date, context_id)
+                if partition_columns:
+                    terraform_script += partition_columns
+
+                # Add partition_by clause
+                if partition_date and context_id:
+                    terraform_script += "  partition_by(partition_date, context_id)\n"
+                elif partition_date:
+                    terraform_script += "  partition_by(partition_date)\n"
+                elif context_id:
+                    terraform_script += "  partition_by(context_id)\n"
+                terraform_script += "}\n\n"  # Close the resource block for the table
+
+                output_file = os.path.join(output_folder, f"{table_name}.tf")
+                with open(output_file, 'w') as f_out:
+                    f_out.write(terraform_script)
+            except Exception as e:
+                error_count += 1
+                with open(error_log_file, "a") as error_file:
+                    error_file.write(f"Error in table {table_name}: {str(e)}\n")
+
+        if error_count == 0:
+            print("Terraform scripts generated successfully.")
+        else:
+            print(f"Error occurred. Check {error_log_file} for details.")
+            print(f"Total {error_count} records written to error log.")
+    except Exception as e:
+        with open(error_log_file, "a") as error_file:
+            error_file.write(f"Error: {str(e)}\n")
