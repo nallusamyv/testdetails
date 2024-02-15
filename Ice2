@@ -1,3 +1,6 @@
+                terraform_script += ''.join(generate_column_definition(row) for row in [row])  # Include columns for the current row
+/
+
 import csv
 import os
 import re
