@@ -1,0 +1,24 @@
+Open sidebar
+ChatGPT 3.5
+
+User
+Fine grained Access control implemented in tps analytics platform successfully and the access control is working as expected in ABC analytics platform.  One observation we noticed that fields PG group specified incorrectly and associated with corresponding AD protected group. Further meeting set up with PO and explain the differences and work with them to resolve this. Please reword
+
+Save & Submit
+
+Cancel
+ChatGPT
+Fine-tuned access control has been effectively integrated into the TPS analytics platform, operating seamlessly within the ABC analytics platform. An observation revealed a misalignment in the fields designated by the PG group, erroneously linked to their respective AD protected groups. We will schedule a meeting with the product owner to elucidate these variances and collaborate on rectifying them.
+
+User
+Fine grained Access control implemented in tps analytics platform successfully and the access control is working as expected in ABCD analytics platform. It was implemented using immuta which uses snowflake native access. The performance is not impacted due to One observation we noticed that fields PG group specified incorrectly and associated with cosponding AD protected group. Further meeting set up with PO and explain the differences and work with them to resolve this. Please reword. 
+ChatGPT
+The implementation of fine-grained access control in the TPS analytics platform has been successful, with seamless functionality observed in the ABCD analytics platform. This was achieved through Immuta, leveraging Snowflake's native access capabilities, ensuring performance remains unaffected. However, an observation indicates that the fields specified by the PG group are inaccurately associated with their corresponding AD protected groups. To address this, a meeting will be arranged with the product owner to discuss these discrepancies and collaborate on resolving them.
+
+
+
+
+Message ChatGPT…
+
+ChatGPT can make mistakes. Consider checking important information.
+ChatGPT
