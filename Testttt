@@ -1,0 +1,29 @@
+from pyspark.context import SparkContext
+from pyspark.sql import SparkSession
+
+# Initialize SparkSession
+spark = SparkSession.builder \
+    .appName("Parquet to Iceberg Conversion") \
+    .config("spark.sql.catalog.spark_catalog", "org.apache.iceberg.spark.SparkCatalog") \
+    .config("spark.sql.catalog.spark_catalog.type", "hive") \
+    .config("spark.sql.catalog.spark_catalog.warehouse", "s3://your-warehouse-location") \
+    .config("spark.sql.catalog.spark_catalog.uri", "s3://your-catalog-location") \
+    .getOrCreate()
+
+# Register Parquet table
+parquet_table_name = "parquet_table"
+parquet_location = "s3://path/to/parquet"
+spark.read.parquet(parquet_location).createOrReplaceTempView(parquet_table_name)
+
+# Write to Iceberg using SQL options
+iceberg_table_name = "iceberg_table"
+iceberg_location = "s3://path/to/iceberg"
+
+spark.sql(f"""
+    CREATE TABLE {iceberg_table_name}
+    USING iceberg
+    OPTIONS (
+        path '{iceberg_location}'
+    )
+    AS SELECT * FROM {parquet_table_name}
+""")
