@@ -1,4 +1,23 @@
-Open sidebar
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import lit, expr, floor, col
+
+spark = SparkSession.builder \
+    .appName("example") \
+    .getOrCreate()
+
+# Assuming you have an existing DataFrame named df
+existing_df = spark.createDataFrame([(i,) for i in range(1, 101)], ["id"])
+
+# Generate random date for each group of 10 records
+existing_df = existing_df.withColumn("random_date", expr("date_add(current_date(), floor(rand() * 100))"))
+
+# Duplicate the random date for each group of 10 records
+duplicated_df = existing_df.withColumn("group_id", (col("id") - 1) / 10) \
+    .withColumn("random_date", expr("first(random_date, true) over (partition by group_id)")) \
+    .drop("group_id")
+
+# Show the DataFrame with 10 records having the same random date for each group
+duplicated_df.show()Open sidebar
 ChatGPT 3.5
 
 User
