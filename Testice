@@ -1,0 +1,20 @@
+from pyspark.sql import SparkSession
+
+# Create a SparkSession
+spark = SparkSession.builder \
+    .appName("Conditional Replacement") \
+    .getOrCreate()
+
+# Load the Parquet file into a DataFrame
+df = spark.read.parquet("path_to_your_parquet_file")
+
+# Apply conditional logic to replace values
+df = df.withColumn("column_to_replace",
+                   when(df["partition_column"] == "condition", "new_value")
+                   .otherwise(df["column_to_replace"]))
+
+# Write the modified DataFrame back to Parquet
+df.write.mode("overwrite").parquet("path_to_output_parquet_file")
+
+# Stop the SparkSession
+spark.stop()
