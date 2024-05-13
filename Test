@@ -1,4 +1,23 @@
 from pyspark.sql import SparkSession
+from pyspark.sql.functions import date_format
+
+spark = SparkSession.builder \
+    .appName("example") \
+    .getOrCreate()
+
+# Assuming you have an existing DataFrame named duplicated_df
+# (generated using the previous code)
+duplicated_df = spark.createDataFrame([(i,) for i in range(1, 101)], ["id"])
+duplicated_df = duplicated_df.withColumn("random_date", expr("date_add(current_date(), floor(rand() * 100).cast('int'))"))
+duplicated_df = duplicated_df.withColumn("group_id", floor((col("id") - 1) / 10))
+duplicated_df = duplicated_df.withColumn("random_date", expr("first(random_date, true) over (partition by group_id)")).drop("group_id")
+
+# Collect distinct partition dates and format them
+partition_dates = duplicated_df.select(date_format("random_date", "yyyyMMdd").alias("partition_date")).distinct().collect()
+
+# Print the partition dates
+for row in partition_dates:
+    print(row["partition_date"])from pyspark.sql import SparkSession
 
 spark = SparkSession.builder \
     .appName("example") \
