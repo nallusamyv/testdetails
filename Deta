@@ -1,0 +1,1 @@
+SELECT REGEXP_SUBSTR('abc/def/bcd=20220101/mainm.parquet', 'bcd=(\\d{8})', 1, 1, 'e')
