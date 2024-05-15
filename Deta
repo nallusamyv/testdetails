@@ -1,1 +1,1 @@
-SELECT REGEXP_SUBSTR('abc/def/bcd=20220101/mainm.parquet', 'bcd=(\\d{8})', 1, 1, 'e')
+SELECT SUBSTRING(REGEXP_SUBSTR('abc/def/bcd=20220101/mainm.parquet', 'bcd=(\\d{8})'), 5, 8) AS extracted_date;SELECT REGEXP_SUBSTR('abc/def/bcd=20220101/mainm.parquet', 'bcd=(\\d{8})', 1, 1, 'e')
