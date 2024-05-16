@@ -1,157 +1,37 @@
-                terraform_script += ''.join(generate_column_definition(row) for row in [row])  # Include columns for the current row
-/
+from pyspark.sql import SparkSession
+from pyspark.sql.types import StructType, StructField, DecimalType, IntegerType, FloatType, StringType
 
-import csv
-import os
-import re
-import shutil
+# Create a SparkSession
+spark = SparkSession.builder \
+    .appName("Writing Parquet File") \
+    .getOrCreate()
 
-def convert_datatype(datatype):
-    # Map Erwin logical data types to Snowflake data types
-    datatype_mapping = {
-        "INTEGER": "INTEGER",
-        "SMALLINT": "SMALLINT",
-        "BIGINT": "BIGINT",
-        "FLOAT": "FLOAT",
-        "DATE": "DATE",
-        "TIME": "TIME",
-        "TIMESTAMP": "TIMESTAMP",
-        "TIMESTAMP WITH TIMEZONE": "TIMESTAMP_NTZ",  # Convert to TIMESTAMP_NTZ
-        "BOOLEAN": "BOOLEAN"
-    }
-   
-    # Extract the datatype and any parameters
-    datatype_parts = re.match(r'^(\w+)(?:\((.*)\))?$', datatype.strip()).groups()
-    datatype_type = datatype_parts[0].upper()
-    datatype_params = datatype_parts[1] if datatype_parts[1] else None
-   
-    # Generate Snowflake datatype based on Erwin datatype
-    snowflake_datatype = {
-        "DECIMAL": f"NUMBER({datatype_params})" if datatype_params else "NUMBER",
-        "NUMERIC": f"NUMBER({datatype_params})" if datatype_params else "NUMBER",
-        "VARCHAR": f"VARCHAR({datatype_params})",
-        "CHAR": f"CHAR({datatype_params})",
-        "DOUBLE": "FLOAT",
-        "DOUBLE PRECISION": "FLOAT",
-        "REAL": "FLOAT"
-    }.get(datatype_type, None)
-   
-    if snowflake_datatype:
-        return snowflake_datatype
-    elif datatype_type in datatype_mapping:
-        return datatype_mapping[datatype_type]
-    else:
-        raise ValueError(f"Invalid data type: {datatype}")
+# Define schema for the DataFrame with one field for each data type
+schema = StructType([
+    StructField("credit_card_number", StringType()),
+    StructField("card_type", StringType()),
+    StructField("expiry_date", StringType()),
+    StructField("cardholder_name", StringType()),
+    StructField("cvv", StringType()),
+    StructField("transaction_amount", DecimalType(10, 2)),
+    StructField("transaction_date", StringType()),
+    StructField("latitude", FloatType()),
+    StructField("longitude", FloatType()),
+    StructField("partition_dt", StringType()),
+    StructField("contxt_id", StringType())
+])
 
-def read_input_csv(input_file):
-    try:
-        with open(input_file, 'r') as f:
-            reader = csv.reader(f)
-            next(reader)  # Skip header line
-            return [row for row in reader]
-    except FileNotFoundError:
-        raise FileNotFoundError(f"Input file not found: {input_file}")
+# Sample data
+data = [
+    ("**** **** **** 1234", "Visa", "05/26", "John Doe", "123", 100.50, "2024-05-16", 40.7128, -74.0060, "2024-05-16", "context1"),
+    ("**** **** **** 5678", "Mastercard", "07/25", "Jane Smith", "456", 200.75, "2024-05-16", 34.0522, -118.2437, "2024-05-16", "context2")
+]
 
-def generate_column_definition(row):
-    table_name, field_name, data_type, _ = row
-    if not table_name.strip() or not field_name.strip() or not data_type.strip():
-        raise ValueError(f"Missing field in row: {row}")
-    if any(c.isspace() for c in table_name.strip()) or any(c.isspace() for c in field_name.strip()) or any(c.isspace() for c in data_type.strip()):
-        raise ValueError(f"Field with spaces detected in row: {row}")
+# Create a DataFrame
+df = spark.createDataFrame(data, schema)
 
-    # Generate Snowflake data type for the current column
-    datatype_sf = convert_datatype(data_type.strip())
+# Write DataFrame to Parquet file partitioned by partition_dt and contxt_id
+df.write.partitionBy("partition_dt", "contxt_id").parquet("credit_card_data.parquet")
 
-    # Generate Terraform script for the current column
-    return f'''
-  column {{
-    name = "{field_name.strip().lower()}"
-    type = "{datatype_sf}"
-    as   = "(CAST (GET($1, '{field_name.strip().lower()}') AS {datatype_sf}))"
-  }}
-'''
-
-def generate_partition_columns(partition_date, context_id):
-    partition_columns = ''
-    if partition_date:
-        partition_columns += '''
-  column {
-    name = "partition_date"
-    type = "VARCHAR(50)"
-    as   = "(SPLIT_PART(METADATA\$FILENAME, '/', 5))"
-  }
-'''
-    if context_id:
-        partition_columns += '''
-  column {
-    name = "context_id"
-    type = "VARCHAR(50)"
-    as   = "(SPLIT_PART(METADATA\$FILENAME, '/', 6))"
-  }
-'''
-    return partition_columns
-
-def generate_terraform_script(input_file, output_folder, error_log_file, partition_date=False, context_id=False):
-    try:
-        if os.path.exists(output_folder):
-            shutil.rmtree(output_folder)  # Remove the output folder and its contents
-
-        os.makedirs(output_folder)  # Recreate the output folder
-
-        rows = read_input_csv(input_file)
-        error_count = 0
-        for row in rows:
-            try:
-                table_name = row[0].strip().lower()
-                terraform_script = f'''
-resource "snowflake_external_table" "{table_name}" {{
-  database    = var.database_name
-  schema      = var.schema_name
-  name        = "{table_name}"
-  location    = var.s3filename
-  comment     = "External table"
-  file_format = "TYPE = PARQUET"
-'''
-                terraform_script += ''.join(generate_column_definition(row) for row in rows)  # Include all columns
-
-                partition_columns = generate_partition_columns(partition_date, context_id)
-                if partition_columns:
-                    terraform_script += partition_columns
-
-                # Add partition_by clause
-                if partition_date and context_id:
-                    terraform_script += "  partition_by(partition_date, context_id)\n"
-                elif partition_date:
-                    terraform_script += "  partition_by(partition_date)\n"
-                elif context_id:
-                    terraform_script += "  partition_by(context_id)\n"
-                terraform_script += "}\n\n"  # Close the resource block for the table
-
-                output_file = os.path.join(output_folder, f"{table_name}.tf")
-                with open(output_file, 'w') as f_out:
-                    f_out.write(terraform_script)
-            except Exception as e:
-                error_count += 1
-                with open(error_log_file, "a") as error_file:
-                    error_file.write(f"Error in line {rows.index(row) + 1}: {str(e)}\n")
-
-        if error_count == 0:
-            print("Terraform scripts generated successfully.")
-        else:
-            print(f"Error occurred. Check {error_log_file} for details.")
-            print(f"Total {error_count} records written to error log.")
-    except Exception as e:
-        with open(error_log_file, "a") as error_file:
-            error_file.write(f"Error: {str(e)}\n")
-
-# Example usage
-input_file = "C:/Users/sures/Downloads/terraform/input/table_details.csv"
-output_folder = "C:/Users/sures/Downloads/terraform/output"
-error_log_file = "C:/Users/sures/Downloads/terraform/output/error.txt"
-partition_date = True
-context_id = True
-
-try:
-    generate_terraform_script(input_file, output_folder, error_log_file, partition_date, context_id)
-except Exception as e:
-    print(f"Error: {str(e)}")
+# Stop the SparkSession
+spark.stop()
