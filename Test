@@ -1,5 +1,5 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.types import StructType, StructField, DecimalType, IntegerType, FloatType, StringType
+from pyspark.sql.types import StructType, StructField, DecimalType, IntegerType, FloatType, StringType, DateType
 
 # Create a SparkSession
 spark = SparkSession.builder \
@@ -14,7 +14,7 @@ schema = StructType([
     StructField("cardholder_name", StringType()),
     StructField("cvv", StringType()),
     StructField("transaction_amount", DecimalType(10, 2)),
-    StructField("transaction_date", StringType()),
+    StructField("transaction_date", DateType()),
     StructField("latitude", FloatType()),
     StructField("longitude", FloatType()),
     StructField("partition_dt", StringType()),
