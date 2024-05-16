@@ -1,0 +1,24 @@
+from awsglue.context import GlueContext
+from pyspark.context import SparkContext
+from pyspark.sql import SparkSession
+
+# Initialize Spark and Glue contexts
+sc = SparkContext()
+glueContext = GlueContext(sc)
+spark = glueContext.spark_session
+
+# Add the Iceberg jar as a dependent library
+spark.sparkContext.addPyFile("s3://path/to/iceberg-spark3-runtime.jar")
+
+# Define the Iceberg CREATE TABLE statement
+create_table_statement = """
+CREATE TABLE your_table_name (
+    id LONG,
+    name STRING
+)
+USING iceberg
+LOCATION 's3://your-bucket/your-table-location'
+"""
+
+# Execute the Iceberg CREATE TABLE statement
+spark.sql(create_table_statement)
