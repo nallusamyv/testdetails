@@ -1,0 +1,15 @@
+from pyspark.sql import SparkSession
+
+# Initialize Spark session
+spark = SparkSession.builder \
+    .appName("InsertParquetDataIntoIcebergTable") \
+    .config("spark.jars", "iceberg-spark3-runtime.jar") \
+    .getOrCreate()
+
+# Read Parquet file into a DataFrame
+parquet_df = spark.read.parquet("s3://path/to/parquet/file")
+
+# Write DataFrame to the Iceberg table
+parquet_df.write.format("iceberg") \
+    .mode("append") \
+    .save("s3://your-bucket/your-table-location")
