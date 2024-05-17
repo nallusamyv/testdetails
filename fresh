@@ -1,5 +1,7 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField, DecimalType, IntegerType, FloatType, StringType, DateType
+from decimal import Decimal
+import datetime
 
 # Create a SparkSession
 spark = SparkSession.builder \
@@ -8,30 +10,33 @@ spark = SparkSession.builder \
 
 # Define schema for the DataFrame with one field for each data type
 schema = StructType([
-    StructField("credit_card_number", StringType()),
-    StructField("card_type", StringType()),
-    StructField("expiry_date", StringType()),
-    StructField("cardholder_name", StringType()),
-    StructField("cvv", StringType()),
-    StructField("transaction_amount", DecimalType(10, 2)),
-    StructField("transaction_date", DateType()),
-    StructField("latitude", FloatType()),
-    StructField("longitude", FloatType()),
-    StructField("partition_dt", StringType()),
-    StructField("contxt_id", StringType())
+    StructField("credit_card_number", StringType(), True),
+    StructField("card_type", StringType(), True),
+    StructField("expiry_date", StringType(), True),
+    StructField("cardholder_name", StringType(), True),
+    StructField("cvv", IntegerType(), True),
+    StructField("transaction_amount", DecimalType(10, 2), True),
+    StructField("transaction_date", DateType(), True),
+    StructField("latitude", FloatType(), True),
+    StructField("longitude", FloatType(), True),
+    StructField("partition_dt", StringType(), True),
+    StructField("contxt_id", StringType(), True)
 ])
 
-# Sample data
+# Sample data with proper conversions
 data = [
-    ("**** **** **** 1234", "Visa", "05/26", "John Doe", "123", 100.50, "2024-05-16", 40.7128, -74.0060, "2024-05-16", "context1"),
-    ("**** **** **** 5678", "Mastercard", "07/25", "Jane Smith", "456", 200.75, "2024-05-16", 34.0522, -118.2437, "2024-05-16", "context2")
+    ("**** **** **** 1234", "Visa", "05/26", "John Doe", 123, Decimal("100.50"), datetime.date(2024, 5, 16), 40.7128, -74.0060, "2024-05-16", "context1"),
+    ("**** **** **** 5678", "Mastercard", "07/25", "Jane Smith", 456, Decimal("200.75"), datetime.date(2024, 5, 16), 34.0522, -118.2437, "2024-05-16", "context2")
+]
+
+# Convert data into a list of tuples
+data_converted = [
+    (record[0], record[1], record[2], record[3], int(record[4]), Decimal(record[5]), datetime.date.fromisoformat(record[6]), float(record[7]), float(record[8]), record[9], record[10])
+    for record in data
 ]
 
 # Create a DataFrame
-df = spark.createDataFrame(data, schema)
+df = spark.createDataFrame(data_converted, schema)
 
 # Write DataFrame to Parquet file partitioned by partition_dt and contxt_id
-df.write.partitionBy("partition_dt", "contxt_id").parquet("credit_card_data.parquet")
-
-# Stop the SparkSession
-spark.stop()
+df.write
