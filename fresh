@@ -1,0 +1,37 @@
+from pyspark.sql import SparkSession
+from pyspark.sql.types import StructType, StructField, DecimalType, IntegerType, FloatType, StringType, DateType
+
+# Create a SparkSession
+spark = SparkSession.builder \
+    .appName("Writing Parquet File") \
+    .getOrCreate()
+
+# Define schema for the DataFrame with one field for each data type
+schema = StructType([
+    StructField("credit_card_number", StringType()),
+    StructField("card_type", StringType()),
+    StructField("expiry_date", StringType()),
+    StructField("cardholder_name", StringType()),
+    StructField("cvv", StringType()),
+    StructField("transaction_amount", DecimalType(10, 2)),
+    StructField("transaction_date", DateType()),
+    StructField("latitude", FloatType()),
+    StructField("longitude", FloatType()),
+    StructField("partition_dt", StringType()),
+    StructField("contxt_id", StringType())
+])
+
+# Sample data
+data = [
+    ("**** **** **** 1234", "Visa", "05/26", "John Doe", "123", 100.50, "2024-05-16", 40.7128, -74.0060, "2024-05-16", "context1"),
+    ("**** **** **** 5678", "Mastercard", "07/25", "Jane Smith", "456", 200.75, "2024-05-16", 34.0522, -118.2437, "2024-05-16", "context2")
+]
+
+# Create a DataFrame
+df = spark.createDataFrame(data, schema)
+
+# Write DataFrame to Parquet file partitioned by partition_dt and contxt_id
+df.write.partitionBy("partition_dt", "contxt_id").parquet("credit_card_data.parquet")
+
+# Stop the SparkSession
+spark.stop()
