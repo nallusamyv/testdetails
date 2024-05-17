@@ -1,3 +1,9 @@
+    .config("spark.sql.catalog.hadoop_catalog.catalog-impl", "org.apache.iceberg.hadoop.HadoopCatalog") \
+    .config("spark.sql.catalog.hadoop_catalog.io-impl", "org.apache.iceberg.aws.s3.S3FileIO") \
+    .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \
+    .config("spark.hadoop.fs.s3a.aws.credentials.provider", "com.amazonaws.auth.DefaultAWSCredentialsProviderChain") \
+    .getOrCreate()
+
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField, DecimalType, IntegerType, FloatType, StringType, DateType
 from decimal import Decimal
