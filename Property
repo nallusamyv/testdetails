@@ -1,0 +1,11 @@
+import os
+
+def get_secret(secret_name):
+    # Simulate getting a secret from AWS Secrets Manager
+    return "your-snowflake-token"
+
+def update_liquibase_properties(token, warehouse):
+    properties_file_path = '/tmp/liquibase.properties'
+    with open(properties_file_path, 'a') as file:
+        file.write(f'\ntoken={token}')
+        file.write(f'\nurl=jdbc:snowflake://<account>.snowflakecomputing.com/?warehouse={warehouse}&db=<database>&schema=<schema>')
