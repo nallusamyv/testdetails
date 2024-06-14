@@ -1,0 +1,60 @@
+import os
+import subprocess
+
+def get_secret(secret_name):
+    # Simulate getting a secret from AWS Secrets Manager
+    return "your-snowflake-token"
+
+def update_liquibase_properties(token):
+    properties_file_path = '/tmp/liquibase.properties'
+    with open(properties_file_path, 'a') as file:
+        file.write(f'\ntoken={token}')
+
+def apply_liquibase(sql_query):
+    # Set the LIQUIBASE_HOME environment variable
+    os.environ['LIQUIBASE_HOME'] = '/opt/liquibase'
+    
+    # Create a temporary changeset file with the SQL query
+    changeset_path = '/tmp/dynamic_changeset.xml'
+    with open(changeset_path, 'w') as file:
+        file.write(f'''
+        <?xml version="1.0" encoding="UTF-8"?>
+        <databaseChangeLog
+            xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+            xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+        
+            <changeSet id="dynamic" author="lambda">
+                <sql>{sql_query}</sql>
+            </changeSet>
+        </databaseChangeLog>
+        ''')
+
+    # Copy liquibase.properties to /tmp and update it with the token
+    token = get_secret('SnowflakeTokenSecret')
+    os.system('cp /opt/liquibase/liquibase.properties /tmp/')
+    update_liquibase_properties(token)
+
+    command = [
+        '/opt/liquibase/liquibase.sh',
+        '--defaultsFile=/tmp/liquibase.properties',
+        'update'
+    ]
+    try:
+        result = subprocess.run(command, check=True, capture_output=True, text=True)
+        print(f"Liquibase output: {result.stdout}")
+        return {
+            'statusCode': 200,
+            'body': result.stdout
+        }
+    except subprocess.CalledProcessError as e:
+        print(f"Liquibase error: {e.stderr}")
+        return {
+            'statusCode': 500,
+            'body': e.stderr
+        }
+
+def lambda_handler(event, context):
+    sql_query = event['sql_query']  # Assume the SQL query is passed in the event
+    return apply_liquibase(sql_query)
