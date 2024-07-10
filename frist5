@@ -1,0 +1,43 @@
+import os
+import boto3
+import subprocess
+
+s3_client = boto3.client('s3')
+
+# Set variables
+s3_bucket = 'your-bucket'
+liquibase_jar_key = 'liquibase/liquibase.jar'
+jdbc_jar_key = 'liquibase/snowflake-jdbc.jar'
+changelog_key = 'liquibase/changelog.xml'
+
+# Local paths to download files
+liquibase_jar_local_path = '/tmp/liquibase.jar'
+jdbc_jar_local_path = '/tmp/snowflake-jdbc.jar'
+changelog_local_path = '/tmp/changelog.xml'
+
+# Download files from S3 to local /tmp directory
+s3_client.download_file(s3_bucket, liquibase_jar_key, liquibase_jar_local_path)
+s3_client.download_file(s3_bucket, jdbc_jar_key, jdbc_jar_local_path)
+s3_client.download_file(s3_bucket, changelog_key, changelog_local_path)
+
+# Set environment variables
+os.environ['LIQUIBASE_HOME'] = '/tmp'
+os.environ['CLASSPATH'] = f"/tmp:{jdbc_jar_local_path}"
+
+# Prepare Liquibase command
+liquibase_command = [
+    'java', '-jar', liquibase_jar_local_path,
+    '--changeLogFile=' + changelog_local_path,
+    '--url=jdbc:snowflake://youraccount.region.snowflakecomputing.com',
+    '--driver=net.snowflake.client.jdbc.SnowflakeDriver',
+    '--classpath=' + jdbc_jar_local_path,
+    '--accessToken=' + 'your-oauth-token',  # Replace with your actual token
+    'update'
+]
+
+# Run Liquibase command
+try:
+    result = subprocess.run(liquibase_command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    print(result.stdout.decode('utf-8'))
+except subprocess.CalledProcessError as e:
+    print(e.stderr.decode('utf-8'))
