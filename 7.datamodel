@@ -1,0 +1,131 @@
+from langchain.document_loaders import CSVLoader
+from langchain.schema import Document
+import pandas as pd
+import re
+import nltk
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
+from langchain.embeddings import AzureOpenAIEmbeddings
+from langchain.vectorstores import Chroma
+
+# Load the CSV file
+csv_file_path = "updated_bank_risk_metadata.csv"
+df = pd.read_csv(csv_file_path)
+
+# Create documents from the DataFrame
+documents = []
+for _, row in df.iterrows():
+    # Combine fields into a single descriptive text representation
+    combined_text = (f"The logical column '{row['logical_column_name']}' corresponds to the physical column '{row['physical_column_name']}' "
+                     f"with a data type of '{row['data_type']}', protected under '{row['protection_group']}' group, "
+                     f"and belongs to PG group '{row['PGGroup']}'.")
+    
+    # Create Document with combined text and metadata
+    metadata = {
+        "logical_column_name": row["logical_column_name"],
+        "physical_column_name": row["physical_column_name"],
+        "data_type": row["data_type"],
+        "protection_group": row["protection_group"],
+        "PGGroup": row["PGGroup"]
+    }
+    
+    doc = Document(page_content=combined_text, metadata=metadata)
+    documents.append(doc)
+
+# Replace OpenAIEmbeddings with AzureOpenAIEmbeddings
+# Configure Azure OpenAI API with the necessary credentials
+embedding_adamodel = AzureOpenAIEmbeddings(
+    deployment="your_deployment_name",  # Replace with your deployment name
+    model="text-embedding-ada-002",      # Replace with your Azure OpenAI model name
+    api_base="https://your-api-endpoint.openai.azure.com/",  # Replace with your Azure OpenAI base endpoint
+    api_version="2023-05-15",            # Replace with the specific API version you're using
+    api_key="your_api_key"               # Replace with your Azure OpenAI API key
+)
+
+# Create embeddings for each document
+embeddings = [embedding_adamodel.embed_query(doc.page_content) for doc in documents]
+metadatas = [doc.metadata for doc in documents]
+
+# Initialize Chroma vector store and store the embeddings with their metadata
+vector_store = Chroma(embedding_function=embedding_adamodel, persist_directory="./chroma_db")
+for doc, embedding, metadata in zip(documents, embeddings, metadatas):
+    vector_store.add_texts(texts=[doc.page_content], metadatas=[metadata], embeddings=[embedding])
+
+# Tokenizer and Stopwords Setup
+nltk.download('punkt')
+nltk.download('stopwords')
+stop_words = set(stopwords.words('english'))
+
+# Define common phrases to be removed during query cleaning
+common_phrases = {
+    "i want to know", "can you tell me", "could you provide", "what is",
+    "please show", "give me", "let me know", "show me", "tell me",
+    "provide", "please provide", "what are the details of", "what is the value of",
+    "can you list", "how do i find", "what’s the name of", "what do we call",
+    "do you know", "would you be able to tell", "how to check", "any details on",
+    "what’s the description of", "related to the field", "field", "column",
+    "metadata", "attribute", "entry", "name of the field", "physical field",
+    "logical field", "column field", "value field", "for the field",
+    "placeholder phrases", "regarding the", "based on the", "specific to",
+    "related to", "in the field of", "with the field name", "concerning the field",
+    "in the column of", "associated with", "terms specific to data types",
+    "field data type", "data type for", "format of", "data type", "data format",
+    "varchar format", "string format", "numeric value of", "description of",
+    "type of", "protection group for", "group name of", "protection level of",
+    "pg group for", "protection group name", "security group for", "group type of",
+    "group category", "that is called", "like", "such as", "could you tell",
+    "could you describe", "any information on", "description of", "what are the",
+    "what is the", "list all", "details about","for the field","want", "know", "field"
+}
+
+# Clean query function
+def clean_query(query):
+    query = query.lower()
+    query = re.sub(r'[^a-zA-Z\s]', '', query)
+    tokens = word_tokenize(query)
+    cleaned_tokens = [token for token in tokens if token not in stop_words and token not in common_phrases]
+    cleaned_query = ' '.join(cleaned_tokens)
+    return cleaned_query
+
+# Example usage
+user_query = "I want to know the physical field name for the field customer closing balance amount"
+cleaned_query = clean_query(user_query)
+print("Original Query:", user_query)
+print("Cleaned Query:", cleaned_query)
+
+# Vector search function
+def vector_search(query, vector_store, top_k=250):
+    """Perform similarity search based on vector embeddings."""
+    query_embedding = embedding_adamodel.embed_query(query)
+    results = vector_store.similarity_search_by_vector(query_embedding, k=top_k)
+
+    present = set()
+    unique_results = []
+    exact_matches = set()  # To track exact matches for logical_column_name
+    
+    for doc in results:
+        identifier = (doc.page_content, frozenset(doc.metadata.items()))
+        logical_column_name = doc.metadata.get('logical_column_name', "")
+        
+        if logical_column_name in exact_matches:
+            continue  # Skip this document if we already have an exact match
+
+        if identifier not in present:
+            present.add(identifier)
+            unique_results.append(doc)
+            exact_matches.add(logical_column_name)  # Track this exact match
+
+    return unique_results
+
+# Perform vector search with the cleaned query
+retrieved_results = vector_search(cleaned_query, vector_store)
+examples_context = "\n".join([
+    f"Logical Column: {doc.metadata['logical_column_name']}, "
+    f"Physical Column: {doc.metadata['physical_column_name']}, "
+    f"Data Type: {doc.metadata['data_type']}, "
+    f"Protection Group: {doc.metadata['protection_group']}, "
+    f"PG Group: {doc.metadata['PGGroup']}"
+    for doc in retrieved_results
+])
+
+print("Retrieved Results:\n", examples_context)
