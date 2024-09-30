@@ -1,0 +1,16 @@
+scikit-learn
+pandas
+numpy
+nltk
+python-dotenv
+langchain-openai
+langchain-community
+langchain
+duckdb
+pandas-profiling
+joblib~=1.1.0
+langchain-chroma
+fuzzywuzzy
+requests
+spacy
+
