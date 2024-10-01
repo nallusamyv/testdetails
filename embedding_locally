@@ -1,0 +1,54 @@
+import pandas as pd
+from sentence_transformers import SentenceTransformer
+from langchain.embeddings import SentenceTransformerEmbeddings
+from langchain.vectorstores import Chroma
+from langchain.schema import Document
+
+# Step 1: Load the CSV File
+csv_file_path = "updated_bank_risk_metadata.csv"  # Replace with your actual CSV file path
+df = pd.read_csv(csv_file_path)
+
+# Extract logical_column_name and other relevant data
+logical_columns = df['logical_column_name'].tolist()
+table_names = df['TABLE_NAME'].tolist()
+physical_columns = df['physical_column_name'].tolist()
+data_types = df['data_type'].tolist()
+protection_groups = df['protection_group'].tolist()
+pg_groups = df['PGGroup'].tolist()
+
+# Step 2: Generate Embeddings
+model = SentenceTransformer('all-MiniLM-L6-v2')
+
+# Batch processing for embeddings
+batch_size = 128
+embeddings = []
+documents = []  # List to hold documents for Chroma
+
+for i in range(0, len(logical_columns), batch_size):
+    batch = logical_columns[i:i + batch_size]
+    # Generate embeddings for the current batch
+    batch_embeddings = model.encode(batch)
+    embeddings.extend(batch_embeddings)
+
+    # Create documents with metadata
+    for j, logical_col in enumerate(batch):
+        documents.append(Document(
+            page_content=logical_col,
+            metadata={
+                "TABLE_NAME": table_names[i + j],
+                "physical_column_name": physical_columns[i + j],
+                "data_type": data_types[i + j],
+                "protection_group": protection_groups[i + j],
+                "PGGroup": pg_groups[i + j]
+            }
+        ))
+
+
+
+# Step 3: Store Embeddings in LangChain Chroma
+# Create an embeddings instance
+embeddings_instance = SentenceTransformerEmbeddings(model_name='all-MiniLM-L6-v2')
+
+# Create a Chroma vector store
+chroma_store = Chroma.from_documents(documents, embeddings_instance)
+chroma_store
