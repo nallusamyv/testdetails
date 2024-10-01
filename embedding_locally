@@ -52,3 +52,32 @@ embeddings_instance = SentenceTransformerEmbeddings(model_name='all-MiniLM-L6-v2
 # Create a Chroma vector store
 chroma_store = Chroma.from_documents(documents, embeddings_instance)
 chroma_store
+
+
+def similarity_search(query_text, n_results=5):
+    # Perform similarity search
+    results = chroma_store.similarity_search(query_text, k=n_results)
+
+    # Create a list to hold the results for the next prompt
+    result_list = []
+    
+    # Collect all relevant columns for the results
+    for result in results:
+        result_data = {
+            "Matched Logical Column": result.page_content,
+            "TABLE_NAME": result.metadata['TABLE_NAME'],
+            "PHYSICAL_COLUMN_NAME": result.metadata['physical_column_name'],
+            "DATA_TYPE": result.metadata['data_type'],
+            "PROTECTION_GROUP": result.metadata['protection_group'],
+            "PG_GROUP": result.metadata['PGGroup']
+        }
+        result_list.append(result_data)
+
+    return result_list  # Return the structured result list
+
+# Example usage of similarity search
+query_text = "customer date of birth"  # Replace with your query
+search_results = similarity_search(query_text)
+examples_context=search_results
+# The results can now be passed to the next prompt
+print(search_results) 
