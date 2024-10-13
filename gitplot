@@ -1,0 +1,85 @@
+import sqlglot
+from langchain_openai import ChatOpenAI
+from dotenv import load_dotenv
+import os
+
+
+# Load environment variables
+load_dotenv()
+open_api_key = os.getenv("TEST_API_KEY")
+os.environ["OPENAI_API_KEY"] = open_api_key
+# Initialize OpenAI API via LangChain
+llm = ChatOpenAI(model="gpt-4", temperature=0)
+
+def convert_query(teradata_query):
+    # Check for special conditions
+    snowflake_query=""
+   
+    if ("VOLATILE" in teradata_query or
+        "RANDOM" in teradata_query or
+        "MONTHS_BETWEEN" in teradata_query or
+        "CHARINDEX" in teradata_query or
+        "TRUNC" in teradata_query or
+        "WITH TIES" in teradata_query or
+        ("ORDER BY" in teradata_query and
+         ("OFFSET" in teradata_query or "ROWS" in teradata_query)) or
+        "QUALIFY" in teradata_query):
+        
+        # Use OpenAI for conversion
+                # Use OpenAI for conversion
+        prompt = f"""
+        Convert the following Teradata SQL query to Snowflake SQL query:
+        Teradata Query: {teradata_query}
+        
+        Please return only the convereted snowflake query
+        """
+        
+        # Get the response from OpenAI
+        response = llm.invoke(prompt)
+        
+        # Accessing the content correctly
+        response_content = response.content.strip()  # Access the content directly
+
+        # Split the response content into converted_query and suggestion
+        snowflake_query =  response_content
+       
+        
+        convertedby='openai'
+    else:
+        # Use sqlglot for conversion
+        snowflake_query = sqlglot.transpile(teradata_query, read='teradata', write='snowflake')
+        convertedby='sqlglot'
+    return convertedby, snowflake_query
+
+
+teradata_queries = [
+    "SELECT top 10 customer_id, customer_name FROM customers;",
+    "SELECT CHARINDEX('test', 'This is a test string') AS position;",
+    "SELECT LAST_DAY(CURRENT_DATE) AS last_day_of_month;",
+    "SELECT MONTHS_BETWEEN(CURRENT_DATE, '2023-01-01') AS month_difference;",
+    "SELECT ADD_MONTHS(CURRENT_DATE, 3) AS future_date;",
+    "SELECT TRUNC(CURRENT_DATE) AS truncated_date;",
+    "SELECT CURRENT_DATE AS today;",
+    "SELECT CURRENT_TIMESTAMP AS now;",
+    "CREATE VOLATILE TABLE temp_customers AS (SELECT customer_id, customer_name FROM customers) WITH DATA;",
+    "SELECT customer_id, IF(age < 18, 'Minor', 'Adult') AS age_group FROM customers;",
+    "SELECT CURRENT_DATE - INTERVAL '7' DAY AS last_week;",
+    "SELECT SUBSTRING(customer_name FROM 1 FOR 3) AS short_name FROM customers;",
+    "SELECT RANDOM(1, 100) AS random_number;",
+    "SELECT ADD_MONTHS(order_date, 3) AS new_order_date FROM orders;",
+    "SELECT MONTHS_BETWEEN(CURRENT_DATE, order_date) AS months_since_order FROM orders;",
+    "SELECT customer_id, customer_name, RANK() OVER (ORDER BY purchase_amount DESC) AS rank FROM purchases QUALIFY rank <= 3 WITH TIES;",
+    "SELECT customer_id, customer_name FROM customers ORDER BY customer_name OFFSET 5 ROWS FETCH NEXT 10 ROWS ONLY;",
+    "SELECT customer_id, RANK() OVER (ORDER BY purchase_amount DESC) AS rank FROM purchases QUALIFY rank <= 10;"
+]
+
+# Convert Teradata to Snowflake using sqlglot
+for query in teradata_queries:
+    try:
+        converted_by,converted_query= convert_query(query)
+        print(f"Original Teradata Query: {query}")
+        print(f"Original Teradata Query: {converted_by}")
+        print(f"Converted Snowflake Query: {converted_query}\n")
+    except Exception as e:
+        print(f"Error converting query: {query}")
+        print(f"Exception: {e}\n")
