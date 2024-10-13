@@ -101,6 +101,10 @@ def get_openai_suggestion(input_row, closest_match):
     response = llm.invoke(prompt)
     return response['choices'][0]['message']['content']  # Access the content of the response
 
+def similarity_percentage(a, b):
+    """Calculate similarity ratio as a percentage."""
+    return similarity(a, b) * 100
+
 def similarity(a, b):
     """Calculate similarity ratio between two strings."""
     return SequenceMatcher(None, a, b).ratio()
@@ -124,6 +128,8 @@ def validate_and_suggest(df_input, vector_store, top_k=5):
         if search_results:
             # Identify the most similar logical column name
             closest_match = max(search_results, key=lambda res: similarity(logical_column_input, res.metadata['logical_column_name']))
+            sim_percentage = similarity_percentage(logical_column_input, closest_match.metadata['logical_column_name'])
+            print(f"Similarity percentage for '{logical_column_input}' and '{closest_match.metadata['logical_column_name']}': {sim_percentage:.2f}%")
             
             # Check if the protection group or datatype needs to be corrected
             suggested_pg_group = None
