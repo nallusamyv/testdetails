@@ -1,0 +1,57 @@
+import openai
+import os
+import re
+
+# Set up Azure OpenAI API credentials
+openai.api_type = "azure"
+openai.api_base = os.getenv("AZURE_OPENAI_ENDPOINT")
+openai.api_version = "2023-05-15"
+openai.api_key = os.getenv("AZURE_OPENAI_API_KEY")
+
+# Function to replace Teradata connection string with Snowflake
+def replace_connection_string(sas_program, teradata_conn_str, snowflake_conn_str):
+    # Use regex to replace the Teradata connection string with Snowflake
+    updated_program = re.sub(teradata_conn_str, snowflake_conn_str, sas_program)
+    return updated_program
+
+# Function to pass the SAS program to OpenAI and get the modified version (SQL conversion)
+def convert_sas_program(sas_program):
+    response = openai.Completion.create(
+        engine="text-davinci-003",  # or use another suitable engine
+        prompt=f"""
+        I have the following SAS program that contains SQL queries written for Teradata. 
+        Please help me with the following:
+        1. Extract all SQL queries from the program (they are enclosed between `PROC SQL;` and `QUIT;`).
+        2. Convert the SQL queries from Teradata to Snowflake.
+        3. Replace the original Teradata SQL queries with the Snowflake SQL queries in the same sections of the program.
+
+        Here is the SAS program:
+
+        {sas_program}
+
+        Please provide the modified SAS program with the converted SQL.
+        """,
+        max_tokens=3000,  # Adjust based on the size of the program
+        temperature=0.3
+    )
+    return response.choices[0].text.strip()
+
+# Example: Passing a SAS program to OpenAI for conversion
+sas_file = 'path_to_your_sas_file.sas'
+with open(sas_file, 'r') as file:
+    sas_program = file.read()
+
+# Replace Teradata connection string with Snowflake connection string
+teradata_conn_str = r"libname tdlib teradata user='username' password='password' server='teradata_server';"
+snowflake_conn_str = r"libname snowlb snowflake user='username' password='password' server='snowflake_server';"
+sas_program_with_snowflake = replace_connection_string(sas_program, teradata_conn_str, snowflake_conn_str)
+
+# Convert the SQL within the SAS program
+converted_sas_program = convert_sas_program(sas_program_with_snowflake)
+
+# Save the updated SAS program
+output_sas_file = 'converted_' + os.path.basename(sas_file)
+with open(output_sas_file, 'w') as file:
+    file.write(converted_sas_program)
+
+print(f"Converted SAS file saved as {output_sas_file}")
