@@ -1,21 +1,20 @@
-    prompt = [
-        {"role": "system", "content": "You are an expert in SQL and database migration."},
-        {"role": "user", "content": f"""
-        I have the following SQL query written in Teradata:
+prompt_template = """
+I have the following SQL query written in Teradata:
         
         {teradata_query}
         
-        Purpose of the query: {query_purpose}
-        
         Please do the following:
-        1. Convert this query to Redshift SQL syntax.
-        2. If there are any schema changes needed, here are the schema changes: {schema_str}. If no schema changes are needed, ignore this step.
+        1. Convert this query to Snowflake SQL syntax.
+        2. The following schema mappings should be considered during conversion: {schema_str}.If {schema_str} list is empty then ingore the schema changes
         3. Generate a suggestion query with the following changes:
-           - If the query contains `SELECT *`, replace it with specific columns like column1, column2.
-           - If the `2ndpartyflag` is set to true, include `partition_date = 20200101` in the `WHERE` clause.
-           - Ensure the suggestion query aligns with Redshift syntax.
+            If the query contains SELECT *, substitute it with specific columns such as column1, column2, etc.
+            If the secondpartyflag is set to True, add partition_date >= '20200101' in the WHERE clause, along with a comment
+              indicating that this is for performance improvement. 
+            
+            Ensure the suggestion query conforms to Snowflake syntax 
 
         Return the following:
-        1. The converted Redshift query.
-        2. The suggestion query.
-        """}
+        1. The converted Snowflake query.
+        2. The suggestion query with comment mentioned in the above and also specify You may consider using comparison operators like >=, >, <, or <= instead of equality.
+        3. Why additional changes in the suggestion query when compared to original converted query
+"""
