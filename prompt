@@ -1,0 +1,21 @@
+    prompt = [
+        {"role": "system", "content": "You are an expert in SQL and database migration."},
+        {"role": "user", "content": f"""
+        I have the following SQL query written in Teradata:
+        
+        {teradata_query}
+        
+        Purpose of the query: {query_purpose}
+        
+        Please do the following:
+        1. Convert this query to Redshift SQL syntax.
+        2. If there are any schema changes needed, here are the schema changes: {schema_str}. If no schema changes are needed, ignore this step.
+        3. Generate a suggestion query with the following changes:
+           - If the query contains `SELECT *`, replace it with specific columns like column1, column2.
+           - If the `2ndpartyflag` is set to true, include `partition_date = 20200101` in the `WHERE` clause.
+           - Ensure the suggestion query aligns with Redshift syntax.
+
+        Return the following:
+        1. The converted Redshift query.
+        2. The suggestion query.
+        """}
