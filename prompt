@@ -1,20 +1,221 @@
+# Define your prompt template
+schema_str = ['Replace old_schema1 with newschemasuresh']
+
 prompt_template = """
 I have the following SQL query written in Teradata:
         
-        {teradata_query}
+{teradata_query}
         
-        Please do the following:
-        1. Convert this query to Snowflake SQL syntax.
-        2. The following schema mappings should be considered during conversion: {schema_str}.If {schema_str} list is empty then ingore the schema changes
-        3. Generate a suggestion query with the following changes:
-            If the query contains SELECT *, substitute it with specific columns such as column1, column2, etc.
-            If the secondpartyflag is set to True, add partition_date >= '20200101' in the WHERE clause, along with a comment
-              indicating that this is for performance improvement. 
-            
-            Ensure the suggestion query conforms to Snowflake syntax 
+Please do the following:
+1. Convert this query to Snowflake SQL syntax.
+2. The following schema mappings should be considered during conversion: {schema_str}. If {schema_str} list is empty, then ignore the schema changes.
+3. Generate a suggestion query with the following changes:
+    - If the query contains SELECT *, substitute it with specific columns such as column1, column2, etc. (near by give comment like replace with actual field name of your table)
+    - If the secondpartyflag is set to {secondpartyflag}, add partition_date >= '20240101' in the WHERE clause, along with a comment indicating that this is for performance improvement. If the query already has partition_date in the filter condition, provide a different suggestion or no suggestion.
+    
+Ensure the suggestion query conforms to Snowflake syntax.
 
-        Return the following:
-        1. The converted Snowflake query.
-        2. The suggestion query with comment mentioned in the above and also specify You may consider using comparison operators like >=, >, <, or <= instead of equality.
-        3. Why additional changes in the suggestion query when compared to original converted query
+Return the following:
+1. The converted Snowflake query.
+2. The suggestion query with a comment indicating why the changes were made. Also, specify that you may consider using comparison operators like >=, >, <, or <= instead of equality.
+3. Explain why additional changes were made in the suggestion query when compared to the original converted query. If the query already has partition_date, don't provide a suggestion like: -- AND partition_date >= '20240101'; -- Add new filter condition with comment for performance improvement.
+4. Explain in natural language what the query is trying to do help users to understand whether the query
 """
+def create_prompt(teradata_query, schema_str,secondpartyflag):
+    return prompt_template.format(teradata_query=teradata_query, schema_str=schema_str,secondpartyflag=secondpartyflag)
+
+teradata_query =  """SELECT TOP 10 age AS average_salary
+FROM old_schema1.employees where partition_date='20240101';"""
+
+secondpartyflag = True
+# Create the prompt
+formatted_prompt = create_prompt(teradata_query, schema_str,secondpartyflag)
+# Prepare the payload
+payload = {
+    'model': 'gpt-3.5-turbo',  # or 'gpt-4'
+    'messages': [{'role': 'user', 'content': formatted_prompt}],
+    'max_tokens': 500  # Adjust as needed
+}
+
+# Make the request
+response = requests.post(url, headers=headers, json=payload)
+
+# Check the response
+if response.status_code == 200:
+    # Extract and print the assistant's response
+    assistant_response = response.json()['choices'][0]['message']['content']
+    print("Assistant:", assistant_response)
+else:
+    print(f'Error code: {response.status_code} - {response.json()}')
+
+--------------------------------------------------------------------------------------
+
+headers = {
+    'Authorization': f'Bearer {api_key}',  # Include your API key in the authorization header
+    'Content-Type': 'application/json'      # Specify that we're sending JSON data
+}
+
+function_categories = [
+    "Aggregate Functions and Aggregation Conversion Functions",
+    "String Functions and String Conversion Functions",
+    "Date, Time, and Timestamp Functions and Their Conversion Functions",
+    "Mathematical Functions and Mathematical Conversion Functions",
+    "Conditional Functions and Their Conversion Functions",
+    "Conversion Functions",
+    "Window Functions and Window Conversion Functions",
+    "Validation Functions and Validation Conversion Functions",
+    "Row Limiting Functions",
+    "Grouping Functions and Grouping Aggregation",
+    "Other Functions Not Previously Categorized",
+    "Data Type Functions and Data Type conversion functions",  # Functions related to specific data types (e.g., numeric, character, date).
+    "JSON Functions",  # Functions for handling JSON data (e.g., JSON_PARSE, JSON_QUERY).
+    "XML Functions",  # Functions for working with XML data (e.g., XMLAGG, XMLPARSE, XMLTRANSFORM).
+    "Error Handling Functions",  # Functions for managing errors or exceptions (e.g., TRY, CAST).
+    "Statistics Functions",  # Functions for statistical analysis (e.g., STDDEV, VARIANCE).
+    "Dynamic SQL Functions"  # Functions related to the execution of dynamic SQL.
+    "any other functions"
+]
+
+# Loop through each category and make the API request
+# Open a file to write the output
+with open('teradata_sql_functions.txt', 'w') as output_file:
+    # Loop through each category and make the API request
+    for category in function_categories:
+        prompt_template = f"""
+        You are knowledgeable in extracting information about Teradata SQL functions. 
+        Please provide a comprehensive list of all the available {category} that are used in `SELECT` statements.
+
+        For each function, please provide a brief description of its usage.
+        """
+
+        # Prepare the payload
+        payload = {
+            'model': 'gpt-3.5-turbo',  # or 'gpt-4'
+            'messages': [{'role': 'user', 'content': prompt_template}],
+            'max_tokens': 200  # Adjust as needed based on expected output
+        }
+
+        # Make the request
+        response = requests.post(url, headers=headers, json=payload)
+
+        # Check the response
+        if response.status_code == 200:
+            # Extract the assistant's response
+            assistant_response = response.json()['choices'][0]['message']['content']
+            # Write the category and response to the output file
+            output_file.write(f"{category}:\n{assistant_response}\n\n")
+            print(f"Written to file: {category}")
+        else:
+            error_message = f'Error code: {response.status_code} - {response.json()}'
+            output_file.write(f"{category}:\n{error_message}\n\n")
+            print(error_message)
+
+print("Output written to teradata_sql_functions.txt")
+
+----------------------------------------------------------------------
+
+import openai
+import os
+import requests
+
+# Load OpenAI API key from environment variable
+openai.api_key = os.getenv("TEST_API_KEY")
+
+# Define the Teradata functions and their descriptions
+teradata_functions = """
+Aggregate Functions:
+1. COUNT: Counts the number of rows returned by a query.
+2. SUM: Calculates the sum of a set of values.
+3. AVG: Calculates the average of a set of values.
+4. MAX: Returns the maximum value in a set of values.
+5. MIN: Returns the minimum value in a set of values.
+
+String Functions:
+1. LENGTH: Returns the length of a string.
+2. UPPER: Converts a string to uppercase.
+3. LOWER: Converts a string to lowercase.
+4. CONCAT: Concatenates two strings.
+
+Date/Time Functions:
+1. CURRENT_DATE: Returns the current date in Teradata format.
+2. CURRENT_TIME: Returns the current time in Teradata format.
+3. CURRENT_TIMESTAMP: Returns the current timestamp in Teradata format.
+
+Mathematical Functions:
+1. ABS: Returns the absolute value of a number.
+2. CEIL: Returns the smallest integer greater than or equal to a number.
+3. FLOOR: Returns the largest integer less than or equal to a number.
+
+Conditional Functions:
+1. CASE: Evaluates a list of conditions and returns one of multiple possible result expressions.
+2. COALESCE: Returns the first non-null expression among its arguments.
+3. NULLIF: Returns null if two expressions are equal.
+
+Conversion Functions:
+1. CAST: Converts a value from one data type to another.
+2. TO_DATE: Converts a string to a date format.
+3. TO_TIMESTAMP: Converts a string to a timestamp format.
+
+Window Functions:
+1. ROW_NUMBER: Assigns a unique sequential integer to each row in a result set.
+2. LAG: Accesses data from a previous row in the result set, based on a specified offset.
+3. LEAD: Accesses data from a subsequent row in the result set, based on a specified offset.
+
+Validating Functions:
+1. IS NULL: Checks if a value is NULL.
+2. IS NOT NULL: Checks if a value is not NULL.
+3. IS TRUE: Checks if a value is TRUE.
+
+Row Limiting Functions:
+1. TOP: Retrieves the top N rows from a result set based on a specified number.
+2. SAMPLE: Randomly selects a specified percentage or number of rows from a result set.
+3. QUALIFY: Allows for filtering of rows based on window functions or aggregate functions.
+
+Grouping Functions:
+1. GROUP BY: Groups rows that have the same values in specified columns into summary rows.
+2. HAVING: Filters records that work on summarized GROUP BY results.
+
+Additional Functions:
+1. EXTRACT: Extracts a specific part of a date or timestamp, such as year, month, day, hour, etc.
+2. DAYNAME: Returns the name of the day of the week for a given date.
+3. INDEX: Returns the position of a substring within a string.
+"""
+
+# Define the Teradata query
+teradata_query = """SELECT department_id, AVG(salary) AS average_salary
+FROM old_schema1.employees
+GROUP BY department_id
+ORDER BY average_salary DESC;"""
+
+# Create the prompt
+prompt_template = f"""
+You are an expert in SQL conversion. Please convert the following Teradata SQL query to Snowflake SQL. 
+Here are the Teradata functions and their descriptions that you should consider during the conversion:
+
+{teradata_functions}
+
+Teradata Query:
+{teradata_query}
+"""
+
+# Prepare the payload for the OpenAI API
+payload = {
+    'model': 'gpt-3.5-turbo',  # or 'gpt-4'
+    'messages': [{'role': 'user', 'content': prompt_template}],
+    'max_tokens': 300  # Adjust as needed
+}
+
+# Make the request to OpenAI
+response = requests.post('https://api.openai.com/v1/chat/completions', 
+                         headers={'Authorization': f'Bearer {openai.api_key}', 'Content-Type': 'application/json'}, 
+                         json=payload)
+
+# Check the response
+if response.status_code == 200:
+    assistant_response = response.json()['choices'][0]['message']['content']
+    print("Converted Snowflake Query:", assistant_response)
+else:
+    print(f'Error code: {response.status_code} - {response.json()}')
+
+
+
