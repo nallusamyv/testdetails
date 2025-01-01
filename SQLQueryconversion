@@ -1,0 +1,77 @@
+import json
+from langchain.chat_models import ChatOpenAI
+from langchain.prompts import PromptTemplate
+from langchain.schema import SystemMessage, HumanMessage
+import os
+from dotenv import load_dotenv
+load_dotenv()
+os.environ["OPENAI_API_KEY"]=os.getenv("TEST_API_KEY")
+os.environ["OPENAI_API_KEY"]
+
+# Load the table schema from a JSON file
+def load_table_schema(file_path):
+    with open(file_path, "r") as json_file:
+        return json.load(json_file)
+
+# Map logical column names to physical column names
+def map_logical_to_physical(user_query, table_schema):
+    for table, details in table_schema.items():
+        for column, metadata in details["columns"].items():
+            logical_name = metadata.get("logical_name")
+            physical_name = metadata.get("physical_name")
+            if logical_name and logical_name in user_query:
+                user_query = user_query.replace(logical_name, physical_name)
+    return user_query
+
+# Define the prompt template for generating SQL
+sql_prompt = PromptTemplate(
+    input_variables=["table_schema", "user_query"],
+    template="""
+    Given the following Snowflake table schema:
+    {table_schema}
+
+    Generate a valid SQL query for the following natural language request:
+    "{user_query}"
+
+    Ensure the SQL query uses correct table and column names.
+    """
+)
+
+# Function to generate SQL query
+def generate_sql_query(user_query, table_schema):
+    # Initialize the ChatOpenAI model
+    llm = ChatOpenAI(model="gpt-4", temperature=0)
+    
+    # Map logical names to physical names in the user query
+    user_query = map_logical_to_physical(user_query, table_schema)
+    
+    # Format the prompt
+    rendered_prompt = sql_prompt.format(
+        table_schema=json.dumps(table_schema, indent=4),
+        user_query=user_query
+    )
+    
+    # Generate the SQL query using chat messages
+    response = llm(
+        [
+            SystemMessage(content="You are a helpful assistant that generates SQL queries based on a given table schema."),
+            HumanMessage(content=rendered_prompt)
+        ]
+    )
+    return response.content
+
+# Main function
+if __name__ == "__main__":
+    # Load table schema from JSON file
+    table_schema = load_table_schema("table_schema.json")
+    
+    # Example natural language query
+    user_query = "Show me all customers who placed orders after January 1, 2023, including their Name and Email."
+    user_query = "Show me all customers whose name contains jack."
+    
+    # Generate SQL query
+    sql_query = generate_sql_query(user_query, table_schema)
+    
+    # Print the generated SQL query
+    print("Generated SQL Query:")
+    print(sql_query)
