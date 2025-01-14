@@ -1,0 +1,81 @@
+import pandas as pd
+import re
+from langchain.llms import AzureOpenAI
+from langchain.chains import ConversationChain
+from langchain.memory import ConversationBufferMemory
+
+# Load the CSV file
+file_path = "path_to_your_csv.csv"  # Update with your file path
+data = pd.read_csv(file_path)
+
+# Initialize the Azure OpenAI LLM
+llm = AzureOpenAI(
+    deployment_name="your_deployment_name",  # Replace with your Azure OpenAI deployment name
+    model="gpt-4",
+    temperature=0
+)
+
+# Function to create a prompt for each row
+def create_prompt(row):
+    instructions = (
+        "You are an expert in database schema design. Given the table and column descriptions, "
+        "provide the following for each column:\n"
+        "- Physical column name\n"
+        "- Data type\n"
+        "- Primary key group (if applicable)\n"
+        "- Protection group (if applicable)\n\n"
+    )
+    table_details = f"Table: {row['dataset_name']} ({row['table_Descirption']})\n"
+    column_details = f"Column: {row['logical column name']} - {row['logical column description']}\n"
+    return instructions + table_details + column_details
+
+# Function to parse the AI response
+def parse_response(response):
+    # Use regex to extract specific fields from the response
+    physical_name = re.search(r"Physical column name: (.+)", response)
+    data_type = re.search(r"Data type: (.+)", response)
+    primary_key_group = re.search(r"Primary key group: (.+)", response)
+    protection_group = re.search(r"Protection group: (.+)", response)
+
+    return {
+        "physical_column_name": physical_name.group(1).strip() if physical_name else None,
+        "data_type": data_type.group(1).strip() if data_type else None,
+        "primary_key_group": primary_key_group.group(1).strip() if primary_key_group else None,
+        "protection_group": protection_group.group(1).strip() if protection_group else None,
+    }
+
+# Generate responses and parse them
+parsed_responses = []
+for _, row in data.iterrows():
+    prompt = create_prompt(row)
+    response = llm(prompt)
+    parsed_response = parse_response(response)
+    parsed_responses.append(parsed_response)
+
+# Add the parsed responses as separate columns in the dataframe
+parsed_df = pd.DataFrame(parsed_responses)
+result_df = pd.concat([data, parsed_df], axis=1)
+
+# Save the results back to a CSV file
+output_path = "output_with_parsed_responses.csv"
+result_df.to_csv(output_path, index=False)
+print(f"Responses with parsed details saved to {output_path}")
+
+# Setup conversational memory for follow-ups
+memory = ConversationBufferMemory()
+
+# Create a conversational chain
+conversation = ConversationChain(
+    llm=llm,
+    memory=memory
+)
+
+# Allow the user to interact with the chatbot
+print("\nChatbot is ready! Type 'exit' to quit.\n")
+while True:
+    user_input = input("You: ")
+    if user_input.lower() == "exit":
+        print("Chatbot session ended. Goodbye!")
+        break
+    response = conversation.run(input=user_input)
+    print(f"Chatbot: {response}")
