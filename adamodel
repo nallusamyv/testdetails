@@ -1,0 +1,47 @@
+import openai
+import chromadb
+
+# Set your OpenAI API key directly
+openai.api_key = "your-openai-api-key-here"  # Replace with your actual API key
+
+# Initialize ChromaDB client (no access token needed)
+client = chromadb.Client(
+    Settings(
+        persist_directory="./chroma_storage",  # Directory to store the database
+        chroma_db_impl="duckdb+parquet"       # Use DuckDB for persistence
+    )
+)
+
+# Get or create a collection in ChromaDB
+collection = client.get_or_create_collection("logical_data_elements")
+
+# Function to generate embeddings for a piece of text
+def generate_embedding(text):
+    response = openai.Embedding.create(
+        model="text-embedding-ada-002",  # Or use any other model
+        input=text
+    )
+    return response['data'][0]['embedding']
+
+# Your search query: Combine Long_name (Employer) and Definition (DOB)
+query = "Employee Date of Birth"  # Search term combining Employer and Date of Birth
+
+# Generate embedding for the query
+query_embedding = generate_embedding(query)
+
+# Perform similarity search in ChromaDB
+results = collection.query(
+    query_embeddings=[query_embedding],  # Query embeddings to search for
+    n_results=5  # Return top 5 results
+)
+
+# Output the results (documents that match the search query)
+for document in results['documents']:
+    print("Matching Document: ", document)
+
+# Retrieve the corresponding abbreviation from metadata
+for metadata in results['metadatas']:
+    preferred_abbreviation = metadata['preferred_abbreviation']
+    alternate_abbreviation = metadata['alternate_abbreviation']
+    print(f"Preferred Abbreviation: {preferred_abbreviation}")
+    print(f"Alternate Abbreviation: {alternate_abbreviation}")
