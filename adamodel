@@ -45,3 +45,96 @@ for metadata in results['metadatas']:
     alternate_abbreviation = metadata['alternate_abbreviation']
     print(f"Preferred Abbreviation: {preferred_abbreviation}")
     print(f"Alternate Abbreviation: {alternate_abbreviation}")
+
+client = chromadb.Client()
+collection = client.get_or_create_collection("logical_data_elements")
+
+# Example documents
+documents = [
+    "Employer: A person or company that employs workers.",
+    "Date of Birth: The date on which a person was born."
+]
+
+# Generate embeddings for the documents
+document_embeddings = [embedding.embed_text(doc) for doc in documents]
+
+# Add documents and embeddings to Chroma
+collection.add(
+    documents=documents,
+    embeddings=document_embeddings,
+    metadatas=[{"info": "Employer definition"}, {"info": "DOB definition"}],
+    ids=["1", "2"]
+)
+
+# Now you can search with an embedding query
+query = "What is the employer?"
+query_embedding = embedding.embed_text(query)
+
+# Perform semantic search
+results = collection.query(
+    query_embeddings=[query_embedding],
+    n_results=2
+)
+
+# Output search results
+print(results)
+3. Azure Cognitive Search Integration
+If you want to use Azure Cognitive Search to perform semantic search based on embeddings, you can also integrate it with LangChain by using it as a vector database.
+
+Example: Using Azure Cognitive Search with LangChain
+Azure Cognitive Search allows you to store, index, and query embeddings. Here’s an example of how to use it with LangChain:
+
+Set up Azure Cognitive Search: You need to create an Azure Cognitive Search instance and define an index for storing embeddings.
+
+Store Embeddings in Azure Cognitive Search: When you generate embeddings using the Azure OpenAI Service, you can store them in the Cognitive Search index.
+
+Query the Cognitive Search Index: Use the embeddings to query the stored data in Cognitive Search.
+
+Unfortunately, direct integration of LangChain with Azure Cognitive Search is a bit more complex and requires specific setup for indexing and querying. You’ll need to use the Azure SDK for Cognitive Search in conjunction with LangChain.
+
+Here’s a general idea of how you would use Azure Cognitive Search with LangChain:
+
+python
+Copy
+Edit
+from azure.core.credentials import AzureKeyCredential
+from azure.search.documents import SearchClient
+from langchain.embeddings import OpenAIEmbeddings
+
+# Set up Azure Cognitive Search
+endpoint = "https://<your-search-service-name>.search.windows.net"
+index_name = "your-index-name"
+api_key = "<your-search-service-api-key>"
+
+search_client = SearchClient(endpoint=endpoint, index_name=index_name, credential=AzureKeyCredential(api_key))
+
+# Set up OpenAI embeddings from Azure
+embedding = OpenAIEmbeddings(
+    model="text-embedding-ada-002",  # Or another model from Azure OpenAI Service
+    openai_api_key="your-azure-api-key",
+    openai_api_base="https://your-openai-endpoint.openai.azure.com/"
+)
+
+# Example text for embeddings
+documents = ["Employer: A person or company that employs workers.", "Date of Birth: The date on which a person was born."]
+
+# Generate embeddings
+document_embeddings = [embedding.embed_text(doc) for doc in documents]
+
+# Store embeddings in Azure Cognitive Search (custom method)
+# Typically, you would index documents here with their embeddings
+
+# Query Cognitive Search
+query = "What is an employer?"
+query_embedding = embedding.embed_text(query)
+
+# Query the search index with the embedding
+# This step involves calling the Cognitive Search API with the query embedding
+
+# For demonstration purposes, assume the query returns results like:
+results = search_client.search(query)  # You would typically pass an embedding query here
+
+# Output the results
+for result in results:
+    print(result)
+
