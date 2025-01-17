@@ -1,3 +1,7 @@
+documents = [
+    "Employer: A person or company that employs workers.",
+    "Date of Birth: The date on which a person was born."
+]
 document_embeddings = []
 for doc in documents:
     response = openai.Embedding.create(
