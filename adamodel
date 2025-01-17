@@ -1,3 +1,41 @@
+document_embeddings = []
+for doc in documents:
+    response = openai.Embedding.create(
+        model=embedding_model,
+        input=doc
+    )
+    document_embeddings.append(response['data'][0]['embedding'])
+
+# Now, you can use these embeddings with a vector store like Chroma
+client = chromadb.Client()
+collection = client.get_or_create_collection("logical_data_elements")
+
+# Add documents and their embeddings to Chroma
+collection.add(
+    documents=documents,
+    embeddings=document_embeddings,
+    metadatas=[{"info": "Employer definition"}, {"info": "DOB definition"}],
+    ids=["1", "2"]
+)
+
+# Now you can search with an embedding query
+query = "What is the employer?"
+query_response = openai.Embedding.create(
+    model=embedding_model,
+    input=query
+)
+query_embedding = query_response['data'][0]['embedding']
+
+# Perform semantic search using Chroma
+results = collection.query(
+    query_embeddings=[query_embedding],
+    n_results=2
+)
+
+# Output search results
+print(results)
+
+
 import openai
 import chromadb
 
