@@ -1,3 +1,10 @@
+import wordninja
+
+text = "sublineofbusiness"
+split_words = wordninja.split(text)
+
+print(" ".join(split_words))
+
 nltk.download('words')
 word_list = set(words.words())
 
