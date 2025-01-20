@@ -1,0 +1,19 @@
+from nltk.corpus import words
+
+# Download the word corpus
+nltk.download("words")
+word_list = set(words.words())
+
+def split_with_nltk(text, word_list):
+    # Recursive function to split the string
+    if not text:
+        return []
+    for i in range(1, len(text) + 1):
+        prefix = text[:i]
+        if prefix in word_list:
+            return [prefix] + split_with_nltk(text[i:], word_list)
+    return [text]  # Fallback to return the full string
+
+text = "sublineofbusiness"
+result = split_with_nltk(text.lower(), word_list)
+print(result)
