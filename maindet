@@ -1,22 +1,19 @@
-import wordninja
+def generate_prioritized_search_phrases(text):
+    # Split the text into words
+    words = text.split()
+    
+    # Collect consecutive 2-word combinations first
+    two_word_phrases = [f"{words[i]} {words[i + 1]}" for i in range(len(words) - 1)]
+    
+    # Collect individual words next
+    single_word_phrases = words[:]
+    
+    # Combine both, prioritizing 2-word combinations
+    return two_word_phrases + single_word_phrases
 
-text = "sublineofbusiness"
-split_words = wordninja.split(text)
+# Example input
+input_text = "customer account number"
 
-print(" ".join(split_words))
-
-nltk.download('words')
-word_list = set(words.words())
-
-def split_with_recursion(text, word_list):
-    if not text:
-        return []
-    for i in range(1, len(text) + 1):
-        prefix = text[:i]
-        if prefix in word_list:
-            return [prefix] + split_with_recursion(text[i:], word_list)
-    return [text]  # Return the full text if no match is found
-
-text = "sublineofbusiness"
-split_words = split_with_recursion(text.lower(), word_list)
-print(" ".join(split_words))
+# Generate search phrases
+search_phrases = generate_prioritized_search_phrases(input_text)
+print(search_phrases)
