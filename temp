@@ -1,0 +1,22 @@
+results = []
+for word in query_words:
+    word_results = vectorstore.similarity_search_with_score(query=word, k=5)  # Top 5 matches per word
+    results.extend(word_results)
+
+# Combine results: Deduplicate and rank by highest score
+combined_results = {}
+for doc, score in results:
+    key = doc.metadata.get('abbr', '')  # Use a unique key, e.g., abbreviation
+    if key not in combined_results or combined_results[key]['score'] < score:
+        combined_results[key] = {'doc': doc, 'score': score}
+
+# Filter results by score threshold (e.g., 0.7)
+final_results = [
+    (result['doc'], result['score'])
+    for result in combined_results.values()
+    if result['score'] >= 0.7
+]
+
+# Display the results
+for doc, score in final_results:
+    print(f"Document: {doc.page_content}, Abbr: {doc.metadata.get('abbr')}, AltAbbr: {doc
