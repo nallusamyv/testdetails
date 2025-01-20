@@ -1,0 +1,79 @@
+from langchain.embeddings.openai import OpenAIEmbeddings
+from langchain.vectorstores import Chroma
+from langchain.vectorstores import VectorStore
+from langchain.llms import OpenAI
+from langchain.prompts import ChatPromptTemplate
+from langchain.schema.output_parser import StrOutputParser
+from langchain.schema.runnable import RunnableBranch
+from langchain_openai import ChatOpenAI
+import pandas as pd
+
+# Sample data (replace with your own data)
+data = [
+    {"long_name": "EMPLOYER", "abbr": "EMPLR", "altabbr": "EMPL", "description": "A person or company that employs workers."},
+    {"long_name": "ACCOUNT", "abbr": "ACCT", "altabbr": "ACC", "description": "A record or statement of financial transactions."},
+    {"long_name": "NUMBER", "abbr": "NUM", "altabbr": "NUMB", "description": "A mathematical value used to count, measure, or label."},
+    # Add all 8500 rows here
+]
+
+# Convert data to DataFrame
+df = pd.DataFrame(data)
+
+# Initialize the embedding model (OpenAI's Ada model for example)
+embedding_model = OpenAIEmbeddings()
+
+# Create embeddings for long_name and description (can also include 'abbr' and 'altabbr')
+embeddings = []
+for _, row in df.iterrows():
+    embedding = embedding_model.embed_text(row['long_name'] + " " + row['description'])
+    embeddings.append(embedding)
+
+# Initialize Chroma vector store and store embeddings
+vector_store = Chroma.from_documents(
+    df['long_name'] + " " + df['description'], embeddings, metadatas=df.to_dict(orient="records")
+)
+
+# Now let's define our search query functions
+
+def search_in_vector_db(query, vectorstore, k=25):
+    """
+    Perform similarity search in the vector store for the given query.
+    """
+    # Generate the embedding for the query
+    query_embedding = embedding_model.embed_text(query)
+    
+    # Perform similarity search and return top k results
+    results = vectorstore.similarity_search_with_score(query, k)
+    return results
+
+# Example queries (one for Logical Name, one for Logical Description)
+logical_name_query = "EMPLOYER ACCOUNT NAME"
+logical_description_query = "This is the employer who contracted with us and it contains their bank account number"
+
+# Perform similarity searches
+results_name = search_in_vector_db(logical_name_query, vector_store)
+results_description = search_in_vector_db(logical_description_query, vector_store)
+
+# Combine and deduplicate results based on 'long_name'
+combined_results = results_name + results_description
+deduplicated_results = {}
+for doc, score in combined_results:
+    long_name = doc.metadata.get("long_name", "")
+    # If not already stored, or higher score, store the entry
+    if long_name not in deduplicated_results or deduplicated_results[long_name][1] < score:
+        deduplicated_results[long_name] = (doc, score)
+
+# Sort by similarity score and retrieve top 25 results
+ranked_results = sorted(deduplicated_results.values(), key=lambda x: x[1], reverse=True)[:25]
+
+# Format and display the final results
+final_results = [{"long_name": doc.metadata["long_name"], 
+                  "abbr": doc.metadata.get("abbr", ""), 
+                  "altabbr": doc.metadata.get("altabbr", ""), 
+                  "score": score} 
+                 for doc, score in ranked_results]
+
+# Print the final results
+for result in final_results:
+    print(f"Long Name: {result['long_name']}, Abbreviation: {result['abbr']}, "
+          f"Alternate Abbreviation: {result['altabbr']}, Score: {result['score']}")
