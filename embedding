@@ -1,0 +1,101 @@
+# store_data.py
+
+import chromadb
+from langchain.embeddings.openai import OpenAIEmbeddings
+from langchain.vectorstores import Chroma
+from langchain.schema import Document
+
+# Initialize the Chroma client
+client = chromadb.Client()
+
+# Create or connect to a ChromaDB collection
+collection_name = "products_collection"
+collection = client.create_collection(collection_name)
+
+# Example product data
+products_list = [
+    {
+        "product_name": "Account Data Management Tool",
+        "logical_description": "A tool to manage and analyze account data securely.",
+        "keyword": "account data",
+        "category": "Software",
+        "price": 299.99
+    },
+    {
+        "product_name": "Customer Relationship Management (CRM)",
+        "logical_description": "CRM software for tracking customer interactions and managing sales.",
+        "keyword": "CRM software",
+        "category": "Software",
+        "price": 499.99
+    }
+]
+
+# Initialize OpenAI Embeddings (or any other embedding model)
+embedding_model = OpenAIEmbeddings()
+
+# Prepare documents and metadata
+documents = []
+metadatas = []
+for idx, product in enumerate(products_list):
+    # Combine product fields into one document
+    combined_content = f"{product['product_name']} {product['logical_description']} {product['keyword']}"
+    
+    doc = Document(
+        page_content=combined_content,  # Combine all fields into a single content
+        metadata={
+            "product_name": product["product_name"],
+            "logical_description": product["logical_description"],
+            "keyword": product["keyword"],
+            "category": product["category"],
+            "price": product["price"]
+        }
+    )
+
+    documents.append(doc)
+    metadatas.append(doc.metadata)
+
+# Now create the Chroma vector store using LangChain and Chroma
+vector_store = Chroma.from_documents(documents, embedding_model, collection=collection)
+
+# Add documents to ChromaDB collection
+vector_store.add_documents(documents, metadatas)
+
+print("Data has been successfully added to ChromaDB using LangChain!")
+
+
+import chromadb
+from langchain.embeddings.openai import OpenAIEmbeddings
+from langchain.vectorstores import Chroma
+
+# Initialize the Chroma client
+client = chromadb.Client()
+
+# Connect to the existing ChromaDB collection
+collection_name = "products_collection"
+collection = client.get_collection(collection_name)
+
+# Initialize OpenAI Embeddings (or any other embedding model)
+embedding_model = OpenAIEmbeddings()
+
+# Create the Chroma vector store using LangChain and Chroma
+vector_store = Chroma(collection=collection, embedding_function=embedding_model)
+
+# Function to perform a search
+def search_collection(query):
+    # Create a query by embedding the search query across the three fields
+    combined_query = query  # You can also combine specific query parts for each field
+
+    # Perform the similarity search in ChromaDB
+    results = vector_store.similarity_search(combined_query, k=3)  # Top 3 results
+
+    return results
+
+# Example query to search for products related to "account data"
+query = "account data management"
+results = search_collection(query)
+
+# Display search results
+for result in results:
+    print(f"Document: {result.page_content}")
+    print(f"Metadata: {result.metadata}")
+    print("-" * 40)
