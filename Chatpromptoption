@@ -3,38 +3,50 @@ from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.chains import LLMChain
 from langchain.prompts import ChatPromptTemplate
 from langchain.chat_models import ChatOpenAI
+from langchain.schema.output_parser import StrOutputParser
 
 # Initialize ChromaDB (local for now)
 vector_db = Chroma(embedding_function=OpenAIEmbeddings())
 
-# Define the prompt
+# Define the prompt template
 prompt = ChatPromptTemplate.from_messages([
-    ("system", "You are an expert in data modeling. Use past processed data to ensure consistency."),
+    ("system", "You are an expert in data modeling. Maintain consistency in logical naming."),
     ("human", "Given the following data:\n\nName: {name}\nDescription: {description}\n\n"
               "Relevant previous rows:\n{retrieved_data}\n\n"
-              "Generate a consistent logical name and description.")
+              "Generate a logical name and a refined description based on previous patterns.")
 ])
 
+# Load OpenAI model
 llm = ChatOpenAI(model_name="gpt-4")
-chain = LLMChain(llm=llm, prompt=prompt)
 
-# Simulating processing multiple rows
+# Output parser to clean the response
+output_parser = StrOutputParser()
+
+# Create LLM chain with parser
+chain = LLMChain(llm=llm, prompt=prompt, output_parser=output_parser)
+
+# Simulated dataset
 data = [
     {"name": "Customer Details", "description": "Contains customer information."},
     {"name": "Order History", "description": "Records of customer purchases."},
 ]
 
+# Process each row
 for row in data:
-    # Retrieve similar past rows
+    # Retrieve similar past rows from vector database
     similar_rows = vector_db.similarity_search(row["name"], k=3)
-    
-    # Convert retrieved data into a readable format
+
+    # Format retrieved data
     retrieved_data = "\n".join([f"{res.page_content}" for res in similar_rows])
-    
-    # Invoke the LLM chain
-    response = chain.invoke({"name": row["name"], "description": row["description"], "retrieved_data": retrieved_data})
-    
-    # Store new result in VectorDB
+
+    # Invoke LLM chain with parsed output
+    response = chain.invoke({
+        "name": row["name"], 
+        "description": row["description"], 
+        "retrieved_data": retrieved_data
+    })
+
+    # Store the new logical name and description in VectorDB
     vector_db.add_texts([f"{row['name']}: {response}"], metadatas=[row])
 
-    print(response)
+    print(f"Processed Row:\nLogical Name & Description:\n{response}\n" + "-" * 50)
