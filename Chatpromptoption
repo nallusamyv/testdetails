@@ -1,0 +1,40 @@
+from langchain.vectorstores import Chroma
+from langchain.embeddings.openai import OpenAIEmbeddings
+from langchain.chains import LLMChain
+from langchain.prompts import ChatPromptTemplate
+from langchain.chat_models import ChatOpenAI
+
+# Initialize ChromaDB (local for now)
+vector_db = Chroma(embedding_function=OpenAIEmbeddings())
+
+# Define the prompt
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "You are an expert in data modeling. Use past processed data to ensure consistency."),
+    ("human", "Given the following data:\n\nName: {name}\nDescription: {description}\n\n"
+              "Relevant previous rows:\n{retrieved_data}\n\n"
+              "Generate a consistent logical name and description.")
+])
+
+llm = ChatOpenAI(model_name="gpt-4")
+chain = LLMChain(llm=llm, prompt=prompt)
+
+# Simulating processing multiple rows
+data = [
+    {"name": "Customer Details", "description": "Contains customer information."},
+    {"name": "Order History", "description": "Records of customer purchases."},
+]
+
+for row in data:
+    # Retrieve similar past rows
+    similar_rows = vector_db.similarity_search(row["name"], k=3)
+    
+    # Convert retrieved data into a readable format
+    retrieved_data = "\n".join([f"{res.page_content}" for res in similar_rows])
+    
+    # Invoke the LLM chain
+    response = chain.invoke({"name": row["name"], "description": row["description"], "retrieved_data": retrieved_data})
+    
+    # Store new result in VectorDB
+    vector_db.add_texts([f"{row['name']}: {response}"], metadatas=[row])
+
+    print(response)
