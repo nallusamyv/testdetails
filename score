@@ -1,0 +1,31 @@
+# Define the prompt with similarity scores
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "You are an expert in data modeling. Maintain consistency in naming based on previous records."),
+    ("human", f"Given the following new data:\n\nName: {new_row['name']}\nDescription: {new_row['description']}\n\n"
+              "Here are 25 most relevant records based on similarity scores:\n\n{retrieved_data}\n\n"
+              "Based on these examples, generate a logical name and description with consistency.")
+])
+
+# Format the retrieved rows with similarity scores
+retrieved_data = "\n".join([
+    f"Similarity Score: {res.metadata['score']:.2f} | Logical Name: {res.metadata['logical_name']} | Description: {res.metadata['description']}"
+    for res in similar_rows
+])
+
+# Load the OpenAI GPT-4 model
+llm = ChatOpenAI(model_name="gpt-4")
+
+# Output parser to clean the result
+output_parser = StrOutputParser()
+
+# Create LLMChain
+chain = LLMChain(llm=llm, prompt=prompt, output_parser=output_parser)
+
+# Get the final generated result
+response = chain.invoke({
+    "name": new_row["name"], 
+    "description": new_row["description"], 
+    "retrieved_data": retrieved_data
+})
+
+print(f"Generated Logical Name & Description:\n{response}")
