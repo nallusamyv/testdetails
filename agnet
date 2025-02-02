@@ -1,0 +1,66 @@
+import pandas as pd
+import chromadb
+from langchain.agents import initialize_agent, AgentType
+from langchain.tools import Tool
+from langchain.chat_models import ChatOpenAI
+from langchain.schema import SystemMessage, HumanMessage
+
+# Initialize OpenAI Model
+llm = ChatOpenAI(model="gpt-4")
+
+# Initialize ChromaDB Vector Store
+vectorstore = chromadb.PersistentClient(path="chroma_db").get_or_create_collection("logical_names")
+
+# 🔹 1️⃣ Generation Agent - Creates Logical Name
+def generate_logical_name(column_name, column_description):
+    """Generates a logical column name based on general guidelines."""
+    system_message = SystemMessage(content="Generate a logical column name following organization naming conventions.")
+    human_message = HumanMessage(content=f"Column: {column_name}\nDescription: {column_description}")
+    response = llm([system_message, human_message])
+    return response.content.strip()
+
+# 🔹 2️⃣ Retrieval Agent - Fetches Similar Names from VectorDB
+def retrieve_similar_names(column_name):
+    """Fetches similar logical column names from ChromaDB."""
+    results = vectorstore.query(query_texts=[column_name], n_results=3)
+    retrieved_names = [item['name'] for item in results['documents'][0]] if results['documents'] else []
+    return retrieved_names if retrieved_names else ["No similar column found"]
+
+# 🔹 3️⃣ Validation Agent - Finalizes Logical Name
+def validate_logical_name(generated_name, retrieved_names):
+    """Validates and finalizes the logical column name."""
+    system_message = SystemMessage(content="Validate and refine the logical column name based on retrieved references and organizational rules.")
+    human_message = HumanMessage(content=f"Generated: {generated_name}\nReferences: {retrieved_names}")
+    response = llm([system_message, human_message])
+    return response.content.strip()
+
+# Define Tools for Agents
+generation_tool = Tool(name="Generate Logical Name", func=generate_logical_name, description="Generates logical column names.")
+retrieval_tool = Tool(name="Retrieve Similar Names", func=retrieve_similar_names, description="Fetches similar column names from vector DB.")
+validation_tool = Tool(name="Validate Logical Name", func=validate_logical_name, description="Validates and finalizes logical names.")
+
+# Initialize Multi-Agent System
+agents = initialize_agent(
+    tools=[generation_tool, retrieval_tool, validation_tool],
+    llm=llm,
+    agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+    verbose=True
+)
+
+# Function to Process a Column
+def process_column(column_name, column_description):
+    """Runs the multi-agent process for generating a logical column name."""
+    final_logical_name = agents.run(f"Generate and validate a logical column name for {column_name} with description: {column_description}")
+    return final_logical_name
+
+# Example Data (Replace with your real dataset)
+df = pd.DataFrame([
+    {"column_name": "cust_id", "description": "Unique identifier for a customer"},
+    {"column_name": "order_amt", "description": "Total amount of an order"}
+])
+
+# Process All Rows
+df["logical_name"] = df.apply(lambda row: process_column(row["column_name"], row["description"]), axis=1)
+
+# Display Results
+print(df)
