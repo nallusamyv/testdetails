@@ -1,0 +1,109 @@
+SYSTEM_MESSAGE = """
+You are a data modeling assistant. Your task is to generate and validate logical names for columns in a dataset.
+Follow these guidelines:
+1. Logical names should be descriptive and concise.
+2. Use camelCase or snake_case for naming conventions.
+3. Avoid using special characters or spaces.
+4. Ensure the logical name aligns with the column's description.
+"""
+
+
+
+
+
+import pandas as pd
+from openai import AzureOpenAI
+from langsmith import Client
+
+# Initialize LangSmith client
+langsmith_client = Client()
+
+# Configure Azure OpenAI client
+client = AzureOpenAI(
+    api_key="your_azure_openai_api_key",  # Replace with your Azure OpenAI API key
+    api_version="2023-05-15",  # Use the latest version
+    azure_endpoint="https://<your-resource-name>.openai.azure.com/"  # Replace with your Azure endpoint
+)
+
+# System message with organization instructions
+SYSTEM_MESSAGE = """
+You are a data modeling assistant. Your task is to generate and validate logical names for columns in a dataset.
+Follow these guidelines:
+1. Logical names should be descriptive and concise.
+2. Use camelCase or snake_case for naming conventions.
+3. Avoid using special characters or spaces.
+4. Ensure the logical name aligns with the column's description.
+"""
+
+# Decorator to log the function's execution to LangSmith
+from langsmith import traceable
+
+@traceable
+def generate_logical_name(name, description):
+    """
+    Generate a logical name for a column using Azure OpenAI.
+    """
+    messages = [
+        {"role": "system", "content": SYSTEM_MESSAGE},
+        {"role": "user", "content": f"""
+        Generate a logical name for the following column:
+        - Name: {name}
+        - Description: {description}
+        """}
+    ]
+    response = client.chat.completions.create(
+        model="gpt-4",  # Replace with your deployed model name
+        messages=messages
+    )
+    return response.choices[0].message.content
+
+@traceable
+def validate_logical_name(name, description, logical_name):
+    """
+    Validate the logical name using Azure OpenAI.
+    """
+    messages = [
+        {"role": "system", "content": SYSTEM_MESSAGE},
+        {"role": "user", "content": f"""
+        Validate whether the following logical name is appropriate for the column:
+        - Name: {name}
+        - Description: {description}
+        - Logical Name: {logical_name}
+        """}
+    ]
+    response = client.chat.completions.create(
+        model="gpt-4",  # Replace with your deployed model name
+        messages=messages
+    )
+    return response.choices[0].message.content
+
+@traceable
+def process_csv(input_csv_path, output_csv_path):
+    """
+    Process the CSV file to generate and validate logical names.
+    """
+    # Load the CSV file
+    df = pd.read_csv(input_csv_path)
+
+    # Generate logical names
+    df['logical_name'] = df.apply(
+        lambda row: generate_logical_name(row['name'], row['description']), axis=1
+    )
+
+    # Validate logical names
+    df['validation_result'] = df.apply(
+        lambda row: validate_logical_name(row['name'], row['description'], row['logical_name']), axis=1
+    )
+
+    # Save the results to a new CSV file
+    df.to_csv(output_csv_path, index=False)
+
+if __name__ == "__main__":
+    # Path to the input CSV file
+    input_csv_path = "input.csv"  # Replace with your input CSV file path
+    # Path to save the output CSV file
+    output_csv_path = "output_with_logical_names_and_validation.csv"  # Replace with your desired output path
+
+    # Run the agent to process the CSV
+    process_csv(input_csv_path, output_csv_path)
+    print(f"Processing complete. Results saved to {output_csv_path}.")
