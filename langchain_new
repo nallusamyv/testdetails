@@ -30,43 +30,48 @@ vector_db = Pinecone(
 
 # System message with organization instructions
 system_message = """
-You are a data modeling assistant. Your task is to generate and validate logical names for columns in a dataset.
+You are a data modeling assistant. Your task is to generate logical names and descriptions for columns in a dataset.
 Follow these guidelines:
-1. Logical names should be descriptive and concise.
+1. Logical names and descriptions should be descriptive and concise.
 2. Use camelCase or snake_case for naming conventions.
 3. Avoid using special characters or spaces.
-4. Ensure the logical name aligns with the column's description.
+4. Ensure the logical name and description align with the column's original name and description.
 """
 
-# Define prompts using LangChain
-generate_prompt = ChatPromptTemplate.from_messages([
+# Define prompt for generating logical name and description together
+generate_name_and_description_prompt = ChatPromptTemplate.from_messages([
     SystemMessagePromptTemplate.from_template(system_message),
     HumanMessagePromptTemplate.from_template("""
-    Generate a logical name for the following column:
+    Generate a logical name and description for the following column:
     - Name: {name}
     - Description: {description}
+
+    Respond in the following format:
+    Logical Name: <logical_name>
+    Logical Description: <logical_description>
     """)
 ])
 
+# Define prompt for validation
 validate_prompt = ChatPromptTemplate.from_messages([
     SystemMessagePromptTemplate.from_template(system_message),
     HumanMessagePromptTemplate.from_template("""
-    Validate whether the following logical names are appropriate for their respective columns:
+    Validate whether the following logical names and descriptions are appropriate for their respective columns:
     {rows}
     """)
 ])
 
 # Create runnable sequences for generation and validation
-generate_sequence = RunnableSequence(
+generate_name_and_description_sequence = RunnableSequence(
     RunnablePassthrough(),  # Pass through the input
-    generate_prompt,  # Use the generate prompt
-    llm  # Use the LLM to generate the logical name
+    generate_name_and_description_prompt,  # Use the generate name and description prompt
+    llm  # Use the LLM to generate the logical name and description
 )
 
 validate_sequence = RunnableSequence(
     RunnablePassthrough(),  # Pass through the input
     validate_prompt,  # Use the validate prompt
-    llm  # Use the LLM to validate the logical names
+    llm  # Use the LLM to validate the logical names and descriptions
 )
 
 # Function to retrieve relevant data from VectorDB
@@ -77,22 +82,36 @@ def retrieve_from_vectordb(query, top_k=3):
     results = vector_db.similarity_search(query, k=top_k)
     return [result.page_content for result in results]  # Return the content of the retrieved documents
 
+# Function to parse the generated logical name and description
+def parse_name_and_description(response):
+    """
+    Parse the logical name and description from the LLM response.
+    """
+    logical_name = response.split("Logical Name: ")[1].split("\n")[0].strip()
+    logical_description = response.split("Logical Description: ")[1].strip()
+    return logical_name, logical_description
+
 # Function to process the CSV
 def process_csv(input_csv_path, output_csv_path, chunk_size=5):
     # Load the CSV file
     df = pd.read_csv(input_csv_path)
 
-    # Generate logical names
-    df['logical_name'] = df.apply(
-        lambda row: generate_sequence.invoke({"name": row['name'], "description": row['description']}), axis=1
+    # Generate logical names and descriptions
+    df[['logical_name', 'logical_description']] = df.apply(
+        lambda row: parse_name_and_description(
+            generate_name_and_description_sequence.invoke({
+                "name": row['name'],
+                "description": row['description']
+            })
+        ), axis=1, result_type="expand"
     )
 
-    # Validate logical names in chunks
+    # Validate logical names and descriptions in chunks
     validation_results = []
     for i in range(0, len(df), chunk_size):
         chunk = df.iloc[i:i + chunk_size]
         rows_to_validate = "\n".join(
-            f"- Name: {row['name']}, Description: {row['description']}, Logical Name: {row['logical_name']}"
+            f"- Name: {row['name']}, Description: {row['description']}, Logical Name: {row['logical_name']}, Logical Description: {row['logical_description']}"
             for _, row in chunk.iterrows()
         )
         validation_result = validate_sequence.invoke({"rows": rows_to_validate})
@@ -111,10 +130,4 @@ def process_csv(input_csv_path, output_csv_path, chunk_size=5):
 
 if __name__ == "__main__":
     # Path to the input CSV file
-    input_csv_path = "input.csv"  # Replace with your input CSV file path
-    # Path to save the output CSV file
-    output_csv_path = "output_with_logical_names_and_validation.csv"  # Replace with your desired output path
-
-    # Run the agent to process the CSV
-    process_csv(input_csv_path, output_csv_path, chunk_size=5)
-    print(f"Processing complete. Results saved to {output_csv_path}.")
+    input_csv_path = "input
