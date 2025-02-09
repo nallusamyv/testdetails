@@ -1,19 +1,31 @@
 import pandas as pd
-from langchain.chains import LLMChain
 from langchain.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
 from langchain.chat_models import AzureChatOpenAI
 from langsmith import Client
+from langchain.vectorstores import Pinecone  # Example: Using Pinecone as VectorDB
+from langchain.embeddings import OpenAIEmbeddings
+from langchain.schema.runnable import RunnablePassthrough, RunnableSequence
 
 # Initialize LangSmith client
 langsmith_client = Client()
 
-# Configure Azure OpenAI
+# Configure Azure OpenAI for generation and validation
 llm = AzureChatOpenAI(
     api_key="your_azure_openai_api_key",  # Replace with your Azure OpenAI API key
     api_version="2023-05-15",  # Use the latest version
     azure_endpoint="https://<your-resource-name>.openai.azure.com/",  # Replace with your Azure endpoint
     deployment_name="gpt-4",  # Replace with your deployed model name
     temperature=0.7
+)
+
+# Configure embeddings for VectorDB (e.g., OpenAI embeddings)
+embeddings = OpenAIEmbeddings(openai_api_key="your_openai_api_key")
+
+# Initialize VectorDB (e.g., Pinecone)
+vector_db = Pinecone(
+    index_name="your-pinecone-index",  # Replace with your Pinecone index name
+    embedding=embeddings,
+    api_key="your_pinecone_api_key"  # Replace with your Pinecone API key
 )
 
 # System message with organization instructions
@@ -44,9 +56,26 @@ validate_prompt = ChatPromptTemplate.from_messages([
     """)
 ])
 
-# Create chains for generation and validation
-generate_chain = LLMChain(llm=llm, prompt=generate_prompt)
-validate_chain = LLMChain(llm=llm, prompt=validate_prompt)
+# Create runnable sequences for generation and validation
+generate_sequence = RunnableSequence(
+    RunnablePassthrough(),  # Pass through the input
+    generate_prompt,  # Use the generate prompt
+    llm  # Use the LLM to generate the logical name
+)
+
+validate_sequence = RunnableSequence(
+    RunnablePassthrough(),  # Pass through the input
+    validate_prompt,  # Use the validate prompt
+    llm  # Use the LLM to validate the logical names
+)
+
+# Function to retrieve relevant data from VectorDB
+def retrieve_from_vectordb(query, top_k=3):
+    """
+    Retrieve relevant data from VectorDB based on a query.
+    """
+    results = vector_db.similarity_search(query, k=top_k)
+    return [result.page_content for result in results]  # Return the content of the retrieved documents
 
 # Function to process the CSV
 def process_csv(input_csv_path, output_csv_path, chunk_size=5):
@@ -55,7 +84,7 @@ def process_csv(input_csv_path, output_csv_path, chunk_size=5):
 
     # Generate logical names
     df['logical_name'] = df.apply(
-        lambda row: generate_chain.run(name=row['name'], description=row['description']), axis=1
+        lambda row: generate_sequence.invoke({"name": row['name'], "description": row['description']}), axis=1
     )
 
     # Validate logical names in chunks
@@ -66,11 +95,16 @@ def process_csv(input_csv_path, output_csv_path, chunk_size=5):
             f"- Name: {row['name']}, Description: {row['description']}, Logical Name: {row['logical_name']}"
             for _, row in chunk.iterrows()
         )
-        validation_result = validate_chain.run(rows=rows_to_validate)
+        validation_result = validate_sequence.invoke({"rows": rows_to_validate})
         validation_results.extend([validation_result] * len(chunk))
 
     # Add validation results to the DataFrame
     df['validation_result'] = validation_results
+
+    # Retrieve relevant data from VectorDB for each row
+    df['vectordb_results'] = df.apply(
+        lambda row: retrieve_from_vectordb(query=row['description']), axis=1
+    )
 
     # Save the results to a new CSV file
     df.to_csv(output_csv_path, index=False)
