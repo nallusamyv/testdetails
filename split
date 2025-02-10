@@ -1,0 +1,45 @@
+from langchain.schema.runnable import RunnableSequence, RunnablePassthrough
+import time
+
+# Initialize call counter
+call_counter = 0
+
+def create_llm():
+    """Function to initialize the LLM."""
+    # Simulating LLM initialization (replace with actual LLM initialization)
+    print("Reinitializing LLM...")
+    time.sleep(1)  # Simulate time delay in reinitialization
+    return llm  # Replace with actual initialization, e.g., OpenAI(model="gpt-4-32k")
+
+# Initialize LLM
+llm = create_llm()
+
+def process_row(row):
+    global call_counter, llm
+
+    # Increment counter
+    call_counter += 1
+
+    # Reinitialize LLM after every 25 calls
+    if call_counter % 25 == 0:
+        llm = create_llm()
+
+    # Define sequence
+    generate_name_and_description_sequence = RunnableSequence(
+        RunnablePassthrough(),
+        generate_name_and_description_prompt,
+        llm
+    )
+
+    # Invoke sequence and parse results
+    return parse_name_and_description(
+        generate_name_and_description_sequence.invoke({
+            "name": row['name'],
+            "description": row['description']
+        })
+    )
+
+# Apply to DataFrame
+df[['logical_name', 'logical_description']] = df.apply(
+    process_row, axis=1, result_type="expand"
+)
