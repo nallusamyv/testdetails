@@ -1,0 +1,7 @@
+Feature	Vector Database	NoSQL Database	SQL Database
+Primary Use Case	Similarity search, AI, ML, RAG	Scalable, flexible data storage	Structured data, transactions
+Data Structure	High-dimensional vectors	Key-Value, Document, Column-Family, Graph	Tables (Rows & Columns)
+Query Type	Nearest Neighbor Search (kNN, ANN)	NoSQL queries, JSON-based	SQL (Structured Query Language)
+Examples	ChromaDB, Pinecone, FAISS, Weaviate, Milvus	MongoDB, Cassandra, DynamoDB, CouchDB	MySQL, PostgreSQL, Oracle, SQL Server
+
+
