@@ -5,3 +5,184 @@ Query Type	Nearest Neighbor Search (kNN, ANN)	NoSQL queries, JSON-based	SQL (Str
 Examples	ChromaDB, Pinecone, FAISS, Weaviate, Milvus	MongoDB, Cassandra, DynamoDB, CouchDB	MySQL, PostgreSQL, Oracle, SQL Server
 
 
+Storage:
+Data Embedding: Raw data (e.g., text, images) is converted into high-dimensional vectors using an embedding model.
+
+Indexing: The vectors are indexed using algorithms like Approximate Nearest Neighbor (ANN) search (e.g., HNSW, FAISS) to enable fast similarity searches.
+
+Metadata Storage: Alongside vectors, metadata (e.g., IDs, labels, timestamps) is stored for contextual retrieval.
+
+Retrieval:
+Query Embedding: The query (e.g., a search term) is converted into a vector using the same embedding model.
+
+Similarity Search: The database performs a similarity search to find the closest vectors to the query vector.
+
+Ranking and Filtering: Results are ranked by similarity scores (e.g., cosine similarity) and optionally filtered by metadata
+
+ChromaDB is an open-source vector database designed for AI applications.
+
+collection.add(
+    documents=data,
+    embeddings=embeddings,
+    metadatas=[{"source": "doc1"}, {"source": "doc2"}],
+    ids=["id1", "id2"]
+)
+
+
+collection.add(
+    documents=documents,  # The actual text content
+    metadatas=metadatas,  # Metadata including page_content
+    ids=ids               # Unique IDs for each document
+)
+
+
+# Generate an embedding for the query
+query = "What is ChromaDB?"
+query_embedding = ada_embedding_fn([query])  # Use the embedding function directly
+
+# Perform a similarity search
+results = collection.query(
+    query_embeddings=query_embedding,
+    n_results=2  # Retrieve top 2 results
+)
+
+# Process the results
+for doc, metadata, score in zip(results['documents'], results['metadatas'], results['distances']):
+    print(f"Document: {doc}")
+    print(f"Page Content: {metadata['page_content']}")
+    print(f"Source: {metadata['source']}")
+    print(f"Similarity Score: {score}")
+    print("---")
+
+
+
+
+# Generate an embedding for the query
+query = "What is ChromaDB?"
+query_embedding = ada_embedding_fn([query])  # Use the embedding function directly
+
+# Perform a similarity search
+results = collection.query(
+    query_embeddings=query_embedding,
+    n_results=2  # Retrieve top 2 results
+)
+
+
+
+Use an embedding model (e.g., OpenAI's text-embedding-ada-002) to generate embeddings for the combined logical_name and logical_description.import openai
+
+def get_ada_embedding(text):
+    response = openai.Embedding.create(
+        input=text,
+        model="text-embedding-ada-002"
+    )
+    return response['data'][0]['embedding']
+
+# Generate embeddings for each entry
+for entry in data:
+    combined_text = f"{entry['logical_name']}: {entry['logical_description']}"
+    entry['embedding'] = get_ada_embedding(combined_text)
+
+Step 3: Store Data in ChromaDB
+Store the data in ChromaDB with the following structure:
+
+documents: Combined logical_name and logical_description.
+
+metadatas: Metadata including logical_name, logical_description, and protection_code.
+
+embeddings: Precomputed embeddings for the combined text.
+
+ids: Unique identifiers for each entry.
+
+import chromadb
+from chromadb.utils import embedding_functions
+
+# Initialize ChromaDB client
+client = chromadb.Client()
+
+# Create a collection
+collection = client.create_collection(name="logical_entities")
+
+# Add data to the collection
+for i, entry in enumerate(data):
+    combined_text = f"{entry['logical_name']}: {entry['logical_description']}"
+    collection.add(
+        documents=[combined_text],
+        metadatas=[{
+            "logical_name": entry["logical_name"],
+            "logical_description": entry["logical_description"],
+            "protection_code": entry["protection_code"]
+        }],
+        embeddings=[entry["embedding"]],
+        ids=[f"id_{i}"]
+    )
+
+page_content: The actual text content, used for generating embeddings and providing context.
+
+metadata: Additional information, used for filtering and organizing results.
+
+documents: The text content, used for similarity search and retrieval.
+
+3. Steps to Retrieve Data
+Step 1: Generate Embedding for the New Query
+When you receive a new name and description, combine them and generate an embedding.
+
+for doc, metadata, score in zip(results['documents'], results['metadatas'], results['distances']):
+    print(f"Logical Name: {metadata['logical_name']}")
+    print(f"Logical Description: {metadata['logical_description']}")
+    print(f"Protection Code: {metadata['protection_code']}")
+    print(f"Similarity Score: {score}")
+    print("---")
+
+for doc, metadata, score in zip(results['documents'], results['metadatas'], results['distances']):
+    print(f"Logical Name: {metadata['logical_name']}")
+    print(f"Logical Description: {metadata['logical_description']}")
+    print(f"Protection Code: {metadata['protection_code']}")
+    print(f"Similarity Score: {score}")
+    print("---")
+
+-----------------------------------------------------------------------------------------------------------------------------------------------
+import chromadb
+from chromadb.utils import embedding_functions
+from sentence_transformers import SentenceTransformer
+
+# Initialize ChromaDB client
+client = chromadb.Client()
+
+# Create a collection with an embedding function
+embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction("all-MiniLM-L6-v2")
+collection = client.create_collection(name="my_collection", embedding_function=embedding_fn)
+
+# Sample data
+documents = [
+    "ChromaDB is a vector database for AI applications.",
+    "OpenAI's GPT-4 is a powerful language model.",
+    "Vector databases are optimized for similarity search.",
+    "Machine learning models generate high-dimensional embeddings.",
+    "Semantic search improves user experience."
+]
+
+# Add documents to the collection
+collection.add(
+    documents=documents,
+    metadatas=[{"source": "doc1"}, {"source": "doc2"}, {"source": "doc3"}, {"source": "doc4"}, {"source": "doc5"}],
+    ids=["id1", "id2", "id3", "id4", "id5"]
+)
+
+
+Query: What is a vector database?
+
+Result 1:
+Document: ChromaDB is a vector database for AI applications.
+Metadata: {'source': 'doc1'}
+Similarity Score: 0.92
+
+Result 2:
+Document: Vector databases are optimized for similarity search.
+Metadata: {'source': 'doc3'}
+Similarity Score: 0.88
+
+Result 3:
+Document: Machine learning models generate high-dimensional embeddings.
+Metadata: {'source': 'doc4'}
+Similarity Score: 0.75
