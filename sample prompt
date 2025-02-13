@@ -1,0 +1,76 @@
+
+Column Name|Description|Semantic Logical Column Name|Semantic Logical Description|Similarity Score
+
+
+Rule #1: Semantic Column Available
+If a semantic column is available (i.e., a logical column name and description exist with a vector similarity score), follow these steps:
+
+Extract the Logical Column Name:
+
+Use the logical_column_name from the semantic data as the derived column name.
+
+Example: If the input is customer_name|The name of the customer|0.95, the derived column name will be customer_name.
+
+Validate the Similarity Score:
+
+Check if the vector_db_similarity_score meets a predefined threshold (e.g., > 0.8). If it does, proceed with the derived column name.
+
+If the score is below the threshold, treat it as if no semantic column is available and follow Rule #2.
+
+Output:
+
+Return the derived logical column name and its description.
+
+Rule #2: Semantic Column Not Available
+If no semantic column is available or the similarity score is below the threshold, follow a standard naming convention:
+
+Standardize the Column Name:
+
+Convert the input column name to lowercase.
+
+Replace spaces, special characters, or invalid symbols with underscores (_).
+
+Example: Input Column Name → input_column_name.
+
+Generate a Logical Description:
+
+If no description is provided, create a generic description based on the column name.
+
+Example: For input_column_name, the description could be "The value for input_column_name."
+
+Output:
+
+Return the standardized column name and the generated description.
+Input:
+Column Name: Customer Name
+
+Description: The name of the customer
+
+Semantic Data: customer_name|The name of the customer|0.95
+
+Rule #1 Applied:
+Derived Column Name: customer_name
+
+Description: The name of the customer
+
+Output:
+Column Name: customer_name
+
+Description: The name of the customer
+
+Input:
+Column Name: Sales Data
+
+Description: No description available
+
+Semantic Data: None
+
+Rule #2 Applied:
+Standardized Column Name: sales_data
+
+Generated Description: The value for sales_data.
+
+Output:
+Column Name: sales_data
+
+Description: The value for sales_data.
