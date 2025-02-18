@@ -1,0 +1,85 @@
+pip install fastapi uvicorn pandas
+
+uvicorn main:app --reload
+
+from fastapi import FastAPI, File, UploadFile, BackgroundTasks, HTTPException
+from fastapi.responses import JSONResponse, FileResponse
+import pandas as pd
+import uuid
+import os
+import time
+from typing import Dict
+
+app = FastAPI()
+
+# In-memory storage for task status and results
+tasks: Dict[str, Dict] = {}
+
+def process_csv_file(task_id: str, file_path: str):
+    """
+    Background task to process the CSV file.
+    """
+    try:
+        # Simulate a long-running process (e.g., 45 minutes)
+        time.sleep(45 * 60)  # Sleep for 45 minutes (for testing, reduce this)
+
+        # Read the CSV file
+        df = pd.read_csv(file_path)
+
+        # Process the CSV (example: convert the first column to uppercase)
+        df.iloc[:, 0] = df.iloc[:, 0].str.upper()
+
+        # Save the processed CSV to a new file
+        output_file_path = f"processed_{task_id}.csv"
+        df.to_csv(output_file_path, index=False)
+
+        # Update task status
+        tasks[task_id]["status"] = "completed"
+        tasks[task_id]["result"] = output_file_path
+    except Exception as e:
+        tasks[task_id]["status"] = "failed"
+        tasks[task_id]["error"] = str(e)
+    finally:
+        # Clean up the uploaded file
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
+@app.post("/upload-csv/")
+async def upload_csv(file: UploadFile = File(...), background_tasks: BackgroundTasks = None):
+    # Generate a unique task ID
+    task_id = str(uuid.uuid4())
+
+    # Save the uploaded file temporarily
+    file_path = f"uploaded_{task_id}.csv"
+    with open(file_path, "wb") as buffer:
+        buffer.write(file.file.read())
+
+    # Initialize task status
+    tasks[task_id] = {"status": "processing", "file_path": file_path}
+
+    # Start the background task
+    background_tasks.add_task(process_csv_file, task_id, file_path)
+
+    # Return the task ID to the client
+    return JSONResponse(content={"task_id": task_id, "status": "processing"})
+
+@app.get("/check-status/{task_id}")
+async def check_status(task_id: str):
+    # Check if the task exists
+    if task_id not in tasks:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    # Return the current status
+    return JSONResponse(content={"task_id": task_id, "status": tasks[task_id]["status"]})
+
+@app.get("/download-result/{task_id}")
+async def download_result(task_id: str):
+    # Check if the task exists and is completed
+    if task_id not in tasks:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if tasks[task_id]["status"] != "completed":
+        raise HTTPException(status_code=400, detail="Task not completed")
+
+    # Return the processed file
+    output_file_path = tasks[task_id]["result"]
+    return FileResponse(output_file_path, filename=output_file_path)
