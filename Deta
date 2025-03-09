@@ -1,1 +1,74 @@
-SELECT SUBSTRING(REGEXP_SUBSTR('abc/def/bcd=20220101/mainm.parquet', 'bcd=(\\d{8})'), 5, 8) AS extracted_date;SELECT REGEXP_SUBSTR('abc/def/bcd=20220101/mainm.parquet', 'bcd=(\\d{8})', 1, 1, 'e')
+Architected a scalable analytics solution by integrating Apache Iceberg tables (stored in S3) with Snowflake, replacing traditional database storage to accelerate query performance by 40% and reduce Snowflake storage costs by 20% through Iceberg’s advanced compression and ACID compliance.
+
+Engineered a vendor-independant architecture to decouple compute and storage, enabling seamless transitions between query engines  without data migration overhead.
+
+Led cross-functional collaboration with business stakeholders to align technical design with enterprise standards, securing architectural approval and adoption across business units.
+
+Key outcomes: Achieved ACID transaction guarantees (critical for business reporting), optimized storage efficiency via Parquet-to-Iceberg migration, and reduced operational dependency on Snowflake’s proprietary storage.
+
+
+S3-Based Analytics Platform – Architected Delta Lake on AWS S3 with hash keys for PK/FK relationships, cutting storage costs and optimizing performance.
+
+Architected an open-format analytics platform on AWS S3 using Delta Lake, eliminating vendor dependencies while ensuring ACID compliance for transactional integrity.
+
+Designed hash keys to enforce primary/foreign key relationships and time-based partitions to track historical data, enabling efficient querying of active/historical records.
+
+Reduced storage costs by ~30% via Delta Lake’s optimized compression and metadata management, while supporting ad-hoc (Athena) and complex queries (Redshift Spectrum).
+
+Built tables from scratch to auto-track data lifecycle (active/history states), ensuring auditability and compliance with business rules.
+
+Impact: Delivered a scalable, cost-efficient solution that decoupled compute/storage layers, avoiding proprietary lock-in and aligning with enterprise standards
+
+
+Executed seamless migration of on-premises applications to AWS, optimizing scalability and efficiency. Developed cloud-native applications using ECS containers.
+
+Automated CI/CD pipelines for ECS deployments, enabling seamless container orchestration and eliminating manual intervention.
+
+Impact: Delivered a future-proof cloud environment with reduced overhead, improved scalability, and enhanced security compliance.
+
+
+Metadata-Driven Table Implementation – Architected and Engineered a pipeline to auto-generate tables, slashing manual DDL efforts and improving governance.
+
+Engineered a pipeline to auto-generate DDL/DML scripts, eliminating manual coding efforts while embedding access controls directly into workflows. This solution evolved into a scalable product, adopted enterprise-wide to standardize governance, accelerate deployments, and reduce human error across business units.
+
+
+Fine-Grained Access Control (Snowflake) – Designed and implemented the customized access control using LOB and Product. 
+
+Custom RBAC Implementation: Built a scalable role-based access model aligned with Line of Business (LOB) and Product hierarchies, ensuring precise data governance.
+
+Automated Policy Enforcement: Integrated access controls into pipelines, slashing manual oversight by 40% and eliminating policy drift.
+
+Cost & Efficiency Gains: Leveraged Snowflake’s native features (e.g., dynamic data masking, row-level security) to avoid third-party tool dependency, reducing licensing costs by 25%.
+
+Compliance Ready: Streamlined audit workflows with centralized permissioning, accelerating compliance reporting.
+
+
+AWS Lake Formation (Tag-Based Access) – Implemented dynamic security controls using metadata tags, automating column/row-level permissions for scalable, compliant data access.
+
+Spearheaded a POC to design and implement dynamic security controls via AWS Lake Formation, leveraging metadata tags to automate row/column-level permissions.
+
+Scalable Governance: Enabled compliant, self-service data access for internal teams while minimizing manual policy management (reduced configuration time by 30%).
+
+Reusable Framework: Successfully adapted the tag-based model for customer-facing access control, standardizing security workflows and accelerating cross-project delivery.
+
+
+On-Prem to AWS Migration
+
+Revamped Data Ingestion: Engineered a configuration-driven ETL pipeline (AWS S3, Glue) to centralize file ingestion, transformation, and loading, replacing fragmented legacy programs and reducing development time by 50%.
+
+Scalable Integration: Designed a unified response framework to streamline interactions with third-party systems, ensuring seamless data exchange and compliance with enterprise standards.
+
+Impact: Cut infrastructure costs by 30%, accelerated migration timelines, and enabled future-proof scalability.
+
+
+Engineered an LLM-powered pipeline using RAG and ChromaDB (vector database) to auto-generate logical/physical column names, descriptions, and protection group classifications, slashing manual data modeling efforts by 70%.
+
+Accuracy & Governance: Integrated automated validation with human-in-the-loop review to ensure metadata accuracy and compliance with enterprise naming standards.
+
+Technical Execution:
+
+LangChain Agents: Parallelized generation and reflection workflows to optimize quality and speed.
+
+FastAPI: Built a scalable interface for seamless integration with downstream tools.
+
+Impact: Accelerated onboarding of new datasets by 60% while eliminating misclassification risks.
