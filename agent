@@ -1,89 +1,108 @@
+import os
+import json
 import pandas as pd
-import chromadb
-from langchain.agents import initialize_agent, AgentType
-from langchain.tools import Tool
-from langchain.chat_models import ChatOpenAI
-from langchain.schema import SystemMessage, HumanMessage
+import numpy as np
+from concurrent.futures import ThreadPoolExecutor
+from langchain.prompts import PromptTemplate
+from langchain.schema.runnable import RunnableParallel
+from langchain.schema.output_parser import StrOutputParser
+import logging
 
-# Initialize OpenAI Model
-llm = ChatOpenAI(model="gpt-4")
+# Import OpenAI token function
+from your_openai_module import getopenaillm  
 
-# Initialize ChromaDB Vector Store
-vectorstore = chromadb.PersistentClient(path="chroma_db").get_or_create_collection("logical_names")
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# 🔹 1️⃣ Generation Agent - Creates Logical Name
-def generate_logical_name(column_name: str, column_description: str) -> str:
-    """Generates a logical column name based on general guidelines."""
-    system_message = SystemMessage(content="Generate a logical column name following organization naming conventions.")
-    human_message = HumanMessage(content=f"Column: {column_name}\nDescription: {column_description}")
-    response = llm([system_message, human_message])
-    return response.content.strip()
+# Token-Aware LLM Wrapper using getopenaillm()
+class TokenAwareLLM:
+    def __init__(self):
+        self.token = None
+        self.refresh_token()
 
-# 🔹 2️⃣ Retrieval Agent - Fetches Similar Names from VectorDB
-def retrieve_similar_names(column_name: str) -> str:
-    """Fetches similar logical column names along with descriptions and scores from ChromaDB."""
-    results = vectorstore.query(query_texts=[column_name], n_results=15)
+    def refresh_token(self):
+        """Fetch a new token using getopenaillm()"""
+        self.token = getopenaillm()
+        logger.info("Token refreshed successfully")
 
-    if results['documents']:
-        retrieved_info = [
-            f"Name: {item['name']}, Description: {item['description']}, Score: {item['score']:.2f}"
-            for item in results['documents'][0]
-        ]
-        return "\n".join(retrieved_info)  # Convert list into a formatted string
-    else:
-        return "No similar column found"
+    def generate(self, prompt):
+        if not self.token:
+            self.refresh_token()
+        return json.dumps({
+            "logical_name": f"Logical_{hash(prompt)}",
+            "logical_description": f"Processed {prompt[:20]}..."
+        })
 
-# 🔹 3️⃣ Validation Agent - Finalizes Logical Name
-def validate_logical_name(generated_name: str, retrieved_names: str) -> str:
-    """Validates and refines the logical column name based on retrieved references."""
-    system_message = SystemMessage(content="Validate and refine the logical column name based on retrieved references and organizational rules.")
-    human_message = HumanMessage(content=f"Generated: {generated_name}\nRetrieved References:\n{retrieved_names}")
-    response = llm([system_message, human_message])
-    return response.content.strip()
+# Setup Processing Chain (Only Logical)
+def setup_chain():
+    logical_prompt = PromptTemplate.from_template(
+        "Analyze column metadata and return approved logical naming.\n"
+        "Input Column: {column_name}\nDescription: {description}\n"
+        "Respond ONLY with valid JSON: {{'logical_name': '...', 'logical_description': '...'}}"
+    )
 
-# Define Tools for Agents (Ensuring Proper Argument Handling)
-generation_tool = Tool(
-    name="Generate Logical Name",
-    func=lambda column_name, column_description: generate_logical_name(column_name, column_description),
-    description="Generates logical column names given a column name and description."
-)
+    llm = TokenAwareLLM()
+    output_parser = StrOutputParser()
 
-retrieval_tool = Tool(
-    name="Retrieve Similar Names",
-    func=lambda column_name: retrieve_similar_names(column_name),
-    description="Fetches similar column names, descriptions, and scores from vector DB."
-)
+    return logical_prompt | llm.generate | output_parser
 
-validation_tool = Tool(
-    name="Validate Logical Name",
-    func=lambda generated_name, retrieved_names: validate_logical_name(generated_name, retrieved_names),
-    description="Validates and finalizes logical names based on references."
-)
+# Process Single Row
+def process_row(chain, row):
+    try:
+        result = chain.invoke({
+            "column_name": row["column_name"],
+            "description": row["description"]
+        })
+        
+        return {
+            **row,
+            **json.loads(result)
+        }
+    except Exception as e:
+        logger.error(f"Processing failed for row {row.name}: {str(e)}")
+        return {**row, "error": str(e)}
 
-# Initialize Multi-Agent System
-agents = initialize_agent(
-    tools=[generation_tool, retrieval_tool, validation_tool],
-    llm=llm,
-    agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
-    verbose=True
-)
+# Process Batch in Parallel
+def process_batch(batch_df):
+    chain = setup_chain()
+    results = [process_row(chain, row) for _, row in batch_df.iterrows()]
+    return results
 
-# Function to Process a Column
-def process_column(column_name: str, column_description: str) -> str:
-    """Runs the multi-agent process for generating a logical column name."""
-    generated_name = generate_logical_name(column_name, column_description)
-    retrieved_names = retrieve_similar_names(column_name)
-    final_logical_name = validate_logical_name(generated_name, retrieved_names)
-    return final_logical_name
+# Split Data into Batches Based on Dataset Name
+def split_batches(df, num_batches=5):
+    """Split dataset while keeping similar dataset names together."""
+    df_sorted = df.sort_values(by=["dataset_name", "column_name"])  # Ensure grouping
+    return np.array_split(df_sorted, num_batches)
 
-# Example Data (Replace with your real dataset)
-df = pd.DataFrame([
-    {"column_name": "cust_id", "description": "Unique identifier for a customer"},
-    {"column_name": "order_amt", "description": "Total amount of an order"}
-])
+# Main Parallel Processing Function
+def process_csv_parallel(input_path, output_path):
+    df = pd.read_csv(input_path)
 
-# Process All Rows
-df["logical_name"] = df.apply(lambda row: process_column(row["column_name"], row["description"]), axis=1)
+    # Split into 5 batches
+    batches = split_batches(df, num_batches=5)
 
-# Display Results
-print(df)
+    results = []
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        batch_results = list(executor.map(process_batch, batches))
+
+    # Flatten results
+    for batch in batch_results:
+        results.extend(batch)
+
+    result_df = pd.DataFrame(results)
+    result_df.to_csv(output_path, index=False)
+    return result_df
+
+# Example Usage
+if __name__ == "__main__":
+    input_csv = "input_data.csv"
+    output_csv = "processed_results.csv"
+    
+    if not os.path.exists(input_csv):
+        raise FileNotFoundError(f"Input file {input_csv} not found")
+        
+    print(f"Starting parallel processing of {input_csv}")
+    result = process_csv_parallel(input_csv, output_csv)
+    print(f"Completed processing. Results saved to {output_csv}")
+    print(f"Successfully processed {len(result) - result['error'].isna().sum()} rows")
