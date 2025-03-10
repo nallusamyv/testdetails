@@ -1,1 +1,135 @@
 
+import pandas as pd
+import openai
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI
+from tenacity import retry, stop_after_attempt, wait_exponential
+from concurrent.futures import ThreadPoolExecutor
+import time
+import logging
+from typing import Tuple, Callable
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[logging.FileHandler('metadata_generation.log'), logging.StreamHandler()]
+)
+
+class TokenManager:
+    """Secure token management with expiration handling"""
+    def __init__(self, token_provider: Callable[[], Tuple[str, float]]):
+        self.token_provider = token_provider
+        self.api_key = None
+        self.expiry = None
+        
+    def refresh(self) -> None:
+        """Fetch new token from external provider"""
+        self.api_key, self.expiry = self.token_provider()
+        logging.info("Refreshed authentication token")
+        
+    def is_valid(self) -> bool:
+        """Check token validity"""
+        return self.api_key and time.time() < self.expiry
+
+class SecureLLMProcessor:
+    """Secure batch processor with automatic token refresh"""
+    def __init__(self, token_manager: TokenManager):
+        self.token_manager = token_manager
+        self.model = None
+        self._initialize_model()
+        
+    def _initialize_model(self) -> None:
+        """Initialize LangChain model with current token"""
+        self.model = ChatOpenAI(
+            api_key=self.token_manager.api_key,
+            model="gpt-4",
+            max_retries=0,
+            timeout=30
+        )
+        
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, max=10))
+    def process_batch(self, batch: pd.DataFrame) -> list:
+        """Process a batch of 5 rows with LLM"""
+        if not self.token_manager.is_valid():
+            logging.warning("Token expired, refreshing...")
+            self.token_manager.refresh()
+            self._initialize_model()
+            
+        try:
+            prompt_template = ChatPromptTemplate.from_messages([
+                ("system", "You're a data architect creating business-friendly metadata."),
+                ("human", "Physical: {ColumnName}\nTechnical: {ColumnDescription}")
+            ])
+            
+            chain = prompt_template | self.model | StrOutputParser()
+            return chain.batch(batch.to_dict('records'))
+            
+        except openai.AuthenticationError:
+            logging.error("Invalid token detected")
+            self.token_manager.refresh()
+            self._initialize_model()
+            raise
+        except Exception as e:
+            logging.error(f"Batch processing failed: {str(e)}")
+            raise
+
+def process_csv(
+    input_path: str,
+    output_path: str,
+    token_provider: Callable[[], Tuple[str, float]],
+    max_workers: int = 2
+) -> None:
+    """Main processing workflow"""
+    token_manager = TokenManager(token_provider)
+    processor = SecureLLMProcessor(token_manager)
+    
+    try:
+        df = pd.read_csv(input_path)
+        results = []
+        futures = []
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit batches for parallel processing
+            for i in range(0, len(df), 5):
+                batch = df.iloc[i:i+5]
+                futures.append(
+                    executor.submit(processor.process_batch, batch[['ColumnName', 'ColumnDescription']])
+                )
+            
+            # Collect results
+            for future, batch_idx in zip(futures, range(0, len(df), 5)):
+                try:
+                    batch_results = future.result()
+                    for result_idx, result in enumerate(batch_results):
+                        results.append({
+                            'SNo': df.iloc[batch_idx + result_idx]['SNo'],
+                            **eval(result)
+                        })
+                except Exception as e:
+                    logging.error(f"Failed batch {batch_idx}-{batch_idx+5}: {str(e)}")
+                    
+        # Save output
+        output_df = df.merge(pd.DataFrame(results), on='SNo')
+        output_df.to_csv(output_path, index=False)
+        logging.info("Processing completed successfully")
+        
+    except Exception as e:
+        logging.critical(f"Fatal error: {str(e)}")
+        # Save partial results if possible
+        if results:
+            pd.DataFrame(results).to_csv(f"partial_{output_path}", index=False)
+        raise
+
+# Example Token Provider (Replace with your implementation)
+def example_token_provider() -> Tuple[str, float]:
+    """Simulate external token provider with 1 minute expiry"""
+    return ("sk-...", time.time() + 60)
+
+if __name__ == "__main__":
+    process_csv(
+        input_path="input.csv",
+        output_path="output.csv",
+        token_provider=example_token_provider,
+        max_workers=3
+    )
