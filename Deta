@@ -1,13 +1,10 @@
 import pandas as pd
-import openai
 import json
-import time
 import logging
-from typing import Tuple, Callable
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from langchain_core.output_parsers import StrOutputParser
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from tenacity import retry, stop_after_attempt, wait_exponential
 from concurrent.futures import ThreadPoolExecutor
 from pydantic import BaseModel, ValidationError
 
@@ -18,157 +15,78 @@ logging.basicConfig(
     handlers=[logging.FileHandler('metadata_generation.log'), logging.StreamHandler()]
 )
 
-# ----------------------
-# Data Validation Model
-# ----------------------
 class ColumnMetadata(BaseModel):
     logical_name: str
     logical_description: str
 
-# ----------------------
-# Token Management
-# ----------------------
-class TokenManager:
-    """Secure token handling with expiration tracking"""
-    def __init__(self, token_provider: Callable[[], Tuple[str, float]]):
-        self.token_provider = token_provider
-        self.api_key = None
-        self.expiry = None
-        
-    def refresh(self) -> None:
-        """Refresh token from external source"""
-        self.api_key, self.expiry = self.token_provider()
-        logging.info("Refreshed authentication token")
-        
-    def is_valid(self) -> bool:
-        """Check token validity"""
-        return self.api_key and time.time() < self.expiry
-
-# ----------------------
-# LLM Processing Core
-# ----------------------
-class SecureLLMProcessor:
-    """Secure parallel processor with auto-refresh"""
-    def __init__(self, token_manager: TokenManager):
-        self.token_manager = token_manager
-        self.model = None
+class LLMProcessor:
+    def __init__(self):
         self.chain = None
-        self._initialize_chain()
+        self._initialize_llm()
         
-    def _initialize_chain(self) -> None:
-        """Initialize LangChain components"""
-        self._initialize_model()
+    def _initialize_llm(self) -> None:
+        self.model = ChatOpenAI(model="gpt-4")
         prompt_template = ChatPromptTemplate.from_messages([
-            ("system", """You're a senior data architect. Create business-friendly metadata:
-            1. Use plain English names
-            2. Descriptions should be 10-15 words
-            3. Maintain technical accuracy"""),
-            ("human", "Physical Column: {ColumnName}\nTechnical Description: {ColumnDescription}")
+            ("system", "Generate business-friendly metadata. Include SNo in JSON response."),
+            ("human", "SNo: {SNo}\nPhysical: {ColumnName}\nTechnical: {ColumnDescription}")
         ])
         self.chain = prompt_template | self.model | StrOutputParser()
-        
-    def _initialize_model(self) -> None:
-        """Initialize model with current token"""
-        self.model = ChatOpenAI(
-            api_key=self.token_manager.api_key,
-            model="gpt-4",
-            max_retries=0,
-            timeout=30
-        )
     
-    @retry(stop=stop_after_attempt(3), 
-          wait=wait_exponential(multiplier=1, max=10),
-          retry=retry_if_exception_type((openai.APIError, openai.RateLimitError)))
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1))
     def process_batch(self, batch: pd.DataFrame) -> list:
-        """Process 5-row batch with error handling"""
-        if not self.token_manager.is_valid():
-            logging.warning("Token expired, refreshing...")
-            self.token_manager.refresh()
-            self._initialize_chain()
-            
         try:
-            return self.chain.batch(batch.to_dict('records'))
-        except openai.AuthenticationError as e:
-            logging.error("Invalid credentials, forcing refresh")
-            self.token_manager.refresh()
-            self._initialize_chain()
-            raise
-        except json.JSONDecodeError as e:
-            logging.error(f"Invalid response format: {str(e)}")
-            raise
+            # Process batch with SNo included
+            return self.chain.batch(batch[['SNo', 'ColumnName', 'ColumnDescription']].to_dict('records'))
         except Exception as e:
             logging.error(f"Processing failed: {str(e)}")
             raise
 
-# ----------------------
-# Main Workflow
-# ----------------------
-def process_csv(
-    input_path: str,
-    output_path: str,
-    token_provider: Callable[[], Tuple[str, float]],
-    max_workers: int = 3
-) -> None:
-    """End-to-end processing pipeline"""
-    token_manager = TokenManager(token_provider)
-    processor = SecureLLMProcessor(token_manager)
+def process_csv(input_path: str, output_path: str, max_workers: int = 3) -> None:
+    processor = LLMProcessor()
     
     try:
         df = pd.read_csv(input_path)
         results = []
-        futures = []
         
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # Submit batches for parallel processing
+            futures = []
             for i in range(0, len(df), 5):
                 batch = df.iloc[i:i+5]
-                futures.append(
-                    executor.submit(
-                        processor.process_batch,
-                        batch[['ColumnName', 'ColumnDescription']].copy()
-                    )
-                )
-            
-            # Collect and validate results
-            for future, batch_idx in zip(futures, range(0, len(df), 5)):
+                futures.append(executor.submit(
+                    processor.process_batch,
+                    batch[['SNo', 'ColumnName', 'ColumnDescription']].copy()
+                ))
+
+            for future in futures:
                 try:
                     batch_results = future.result()
-                    for result_idx, result in enumerate(batch_results):
+                    for result in batch_results:
                         try:
                             parsed = json.loads(result)
-                            validated = ColumnMetadata(**parsed)
+                            validated = ColumnMetadata(**{k:v for k,v in parsed.items() if k != 'SNo'})
                             results.append({
-                                'SNo': df.iloc[batch_idx + result_idx]['SNo'],
+                                'SNo': parsed['SNo'],  # Preserve SNo from input
                                 **validated.dict()
                             })
-                        except (json.JSONDecodeError, ValidationError) as e:
-                            logging.error(f"Invalid response in batch {batch_idx}: {str(e)}")
+                        except (KeyError, json.JSONDecodeError, ValidationError) as e:
+                            logging.error(f"Invalid response format: {str(e)}")
                 except Exception as e:
-                    logging.error(f"Failed batch {batch_idx}-{batch_idx+5}: {str(e)}")
-        
-        # Merge and save results
-        output_df = df.merge(pd.DataFrame(results), on='SNo')
+                    logging.error(f"Batch failed: {str(e)}")
+
+        # Merge using SNo as key
+        output_df = df.merge(pd.DataFrame(results), on='SNo', how='left')
         output_df.to_csv(output_path, index=False)
-        logging.info(f"Successfully processed {len(output_df)} records")
+        logging.info(f"Processed {len(output_df)} records")
         
     except Exception as e:
-        logging.critical(f"Fatal error: {str(e)}")
+        logging.critical(f"Critical error: {str(e)}")
         if results:
             pd.DataFrame(results).to_csv(f"partial_{output_path}", index=False)
         raise
-
-# ----------------------
-# Example Implementation
-# ----------------------
-def example_token_provider() -> Tuple[str, float]:
-    """Replace with your actual token provider"""
-    # Implement your token retrieval logic here
-    return ("sk-your-api-key", time.time() + 60)  # 60 second expiry
 
 if __name__ == "__main__":
     process_csv(
         input_path="input.csv",
         output_path="output.csv",
-        token_provider=example_token_provider,
         max_workers=3
     )
