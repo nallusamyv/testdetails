@@ -7,86 +7,141 @@ from langchain_core.output_parsers import StrOutputParser
 from tenacity import retry, stop_after_attempt, wait_exponential
 from concurrent.futures import ThreadPoolExecutor
 from pydantic import BaseModel, ValidationError
+from typing import Optional
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[logging.FileHandler('metadata_generation.log'), logging.StreamHandler()]
+    handlers=[
+        logging.FileHandler('metadata_generation.log'),
+        logging.StreamHandler()
+    ]
 )
 
-class ColumnMetadata(BaseModel):
+class EnhancedColumnMetadata(BaseModel):
     logical_name: str
     logical_description: str
+    business_rules: Optional[str] = None
+    data_type: Optional[str] = None
 
-class LLMProcessor:
+class EnhancedLLMProcessor:
     def __init__(self):
         self.chain = None
         self._initialize_llm()
         
     def _initialize_llm(self) -> None:
-        self.model = ChatOpenAI(model="gpt-4")
+        self.model = ChatOpenAI(model="gpt-4", temperature=0.1)
         prompt_template = ChatPromptTemplate.from_messages([
-            ("system", "Generate business-friendly metadata. Include SNo in JSON response."),
-            ("human", "SNo: {SNo}\nPhysical: {ColumnName}\nTechnical: {ColumnDescription}")
+            ("system", """Generate metadata with these 4 fields: 
+            1. logical_name (business-friendly column name)
+            2. logical_description (clear business purpose)
+            3. business_rules (key validation rules)
+            4. data_type (semantic data type)
+            Maintain SNo from input. Return valid JSON only."""),
+            ("human", "SNo: {SNo}\nFull Record:\n{row_data}")
         ])
         self.chain = prompt_template | self.model | StrOutputParser()
     
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1))
     def process_batch(self, batch: pd.DataFrame) -> list:
         try:
-            # Process batch with SNo included
-            return self.chain.batch(batch[['SNo', 'ColumnName', 'ColumnDescription']].to_dict('records'))
+            prepared_batch = []
+            for _, row in batch.iterrows():
+                row_data = "\n".join(
+                    [f"{col}: {val}" for col, val in row.items() if col != "SNo"]
+                )
+                prepared_batch.append({
+                    "SNo": row["SNo"],
+                    "row_data": row_data
+                })
+            return self.chain.batch(prepared_batch)
         except Exception as e:
-            logging.error(f"Processing failed: {str(e)}")
+            logging.error(f"Batch processing failed: {str(e)}")
             raise
 
-def process_csv(input_path: str, output_path: str, max_workers: int = 3) -> None:
-    processor = LLMProcessor()
+def enhanced_process_csv(
+    input_path: str, 
+    output_path: str, 
+    max_workers: int = 3
+) -> None:
+    processor = EnhancedLLMProcessor()
+    results = []
     
     try:
-        df = pd.read_csv(input_path)
-        results = []
+        df = pd.read_csv(input_path).convert_dtypes()
+        original_columns = df.columns.tolist()
         
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = []
-            for i in range(0, len(df), 5):
+            for i in range(0, len(df), 5):  # Batch size of 5
                 batch = df.iloc[i:i+5]
                 futures.append(executor.submit(
                     processor.process_batch,
-                    batch[['SNo', 'ColumnName', 'ColumnDescription']].copy()
+                    batch.copy()
                 ))
-
+            
             for future in futures:
                 try:
-                    batch_results = future.result()
-                    for result in batch_results:
+                    batch_responses = future.result()
+                    for response in batch_responses:
                         try:
-                            parsed = json.loads(result)
-                            validated = ColumnMetadata(**{k:v for k,v in parsed.items() if k != 'SNo'})
+                            parsed = json.loads(response)
+                            validated = EnhancedColumnMetadata(**{
+                                k: v for k, v in parsed.items() 
+                                if k != "SNo"
+                            })
                             results.append({
-                                'SNo': parsed['SNo'],  # Preserve SNo from input
+                                "SNo": parsed["SNo"],
                                 **validated.dict()
                             })
-                        except (KeyError, json.JSONDecodeError, ValidationError) as e:
-                            logging.error(f"Invalid response format: {str(e)}")
+                        except json.JSONDecodeError as e:
+                            logging.error(f"Invalid JSON: {e.doc}")
+                        except KeyError as e:
+                            logging.error(f"Missing SNo in response: {response}")
+                        except ValidationError as e:
+                            logging.error(f"Validation failed: {e.json()}")
                 except Exception as e:
                     logging.error(f"Batch failed: {str(e)}")
-
-        # Merge using SNo as key
-        output_df = df.merge(pd.DataFrame(results), on='SNo', how='left')
-        output_df.to_csv(output_path, index=False)
-        logging.info(f"Processed {len(output_df)} records")
         
-    except Exception as e:
-        logging.critical(f"Critical error: {str(e)}")
+        # Merge results with original data
         if results:
-            pd.DataFrame(results).to_csv(f"partial_{output_path}", index=False)
+            results_df = pd.DataFrame(results)
+            merged_df = df.merge(
+                results_df,
+                on="SNo",
+                how="left",
+                validate="one_to_one"
+            )
+            # Ensure original column order + new columns
+            new_columns = [
+                "logical_name", 
+                "logical_description",
+                "business_rules", 
+                "data_type"
+            ]
+            final_columns = original_columns + new_columns
+            merged_df = merged_df[final_columns]
+        else:
+            merged_df = df
+            logging.warning("No metadata generated - outputting original data")
+        
+        merged_df.to_csv(output_path, index=False)
+        logging.info(f"Successfully processed {len(merged_df)} records")
+        
+    except pd.errors.EmptyDataError:
+        logging.error("Input CSV is empty or corrupt")
+    except FileNotFoundError:
+        logging.error(f"Input file not found: {input_path}")
+    except Exception as e:
+        logging.critical(f"Critical failure: {str(e)}")
+        if results:
+            pd.DataFrame(results).to_csv(f"emergency_output_{output_path}", index=False)
         raise
 
 if __name__ == "__main__":
-    process_csv(
+    enhanced_process_csv(
         input_path="input.csv",
-        output_path="output.csv",
+        output_path="enhanced_output.csv",
         max_workers=3
     )
