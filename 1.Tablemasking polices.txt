@@ -1,120 +1,104 @@
-# Install required libraries
-# pip install langchain openai pandas
-
 import pandas as pd
-from langchain.schema import SystemMessage, HumanMessage
-from langchain.chains import LLMChain
-from langchain.prompts import ChatPromptTemplate
-from langchain.llms import OpenAI
-from langchain.schema.runnable import RunnableParallel
-from langchain.memory import ConversationBufferMemory
-import time
+import concurrent.futures
+import json
+import re
+from openai import OpenAI  # Use actual OpenAI client
 
-# Step 1: Token Management
-class TokenManager:
-    def __init__(self, token_initializer):
-        self.token_initializer = token_initializer
-        self.access_token = self.token_initializer()
-        self.last_refresh_time = time.time()
+client = OpenAI(api_key="your_api_key")
 
-    def get_token(self):
-        # Refresh token if it has expired (e.g., after 1 hour)
-        if time.time() - self.last_refresh_time > 3600:  # 1 hour expiration
-            self.access_token = self.token_initializer()
-            self.last_refresh_time = time.time()
-        return self.access_token
+# Preprocess and group data
+def preprocess_data(df):
+    df["column_parts"] = df["columnname"].apply(lambda x: x.split("_"))
+    df["first_word"] = df["column_parts"].apply(lambda x: x[0])
+    df["remaining_words"] = df["column_parts"].apply(lambda x: "_".join(x[1:]) if len(x) > 1 else "")
+    return df
 
-# Example token initializer function (replace with your actual logic)
-def initialize_token():
-    print("Refreshing access token...")
-    return "your_new_access_token"
+# Generate chat messages for a batch
+def generate_chat_messages(tablename, batch_data):
+    system_msg = {
+        "role": "system",
+        "content": f'''
+        You are a data modeling assistant. Generate UNIQUE logical names and descriptions for database columns.
+        Rules:
+        1. Logical names must be unique within this batch (e.g., "24 Month Balance" vs "12 Month Balance").
+        2. Include distinguishing terms like numbers or time periods.
+        3. Descriptions should explain business context.
+        '''
+    }
 
-# Initialize token manager
-token_manager = TokenManager(initialize_token)
+    user_content = f"Table: {tablename}\nColumns:\n"
+    for _, row in batch_data.iterrows():
+        user_content += f"- {row['columnname']}: {row['columndescription']}\n"
 
-# Step 2: Initialize LLM with Token Refresh
-def initialize_llm():
-    return OpenAI(
-        openai_api_key=token_manager.get_token(),  # Use the refreshed token
-        temperature=0.7
-    )
+    user_msg = {
+        "role": "user",
+        "content": user_content + "\nOutput JSON:"
+    }
 
-# Step 3: Define Memory for Previous Results
-memory = ConversationBufferMemory(memory_key="chat_history")
+    return [system_msg, user_msg]
 
-# Step 4: Define Prompt Templates with Memory
-# Template for generating a logical name
-logical_name_template = ChatPromptTemplate.from_messages([
-    ("system", "You are a helpful assistant."),
-    ("human", "Generate a logical name for: {input}"),
-])
-
-# Template for generating a description
-description_template = ChatPromptTemplate.from_messages([
-    ("system", "You are a helpful assistant."),
-    ("human", "Generate a description for: {input}"),
-])
-
-# Step 5: Define LLM Chains with Memory
-# Chain for generating a logical name
-logical_name_chain = LLMChain(
-    llm=initialize_llm(),  # Initialize LLM with token refresh
-    prompt=logical_name_template,
-    output_key="logical_name",
-    memory=memory  # Add memory to the chain
-)
-
-# Chain for generating a description
-description_chain = LLMChain(
-    llm=initialize_llm(),  # Initialize LLM with token refresh
-    prompt=description_template,
-    output_key="description",
-    memory=memory  # Add memory to the chain
-)
-
-# Step 6: Use RunnableParallel to Run Chains in Parallel
-# Define the parallel runnable
-parallel_runnable = RunnableParallel(
-    logical_name=logical_name_chain,
-    description=description_chain
-)
-
-# Step 7: Load the Input CSV File
-input_csv_path = "input.csv"  # Replace with your input CSV file path
-output_csv_path = "output.csv"  # Replace with your desired output CSV file path
-
-# Load the CSV file into a DataFrame
-df = pd.read_csv(input_csv_path)
-
-# Step 8: Process Each Row and Generate Results
-results = []
-
-for index, row in df.iterrows():
-    input_data = {"input": row["input"]}  # Replace "input" with the column name in your CSV
-
+# Process a batch with chat memory
+def process_batch(group_key, batch_data):
+    tablename, first_word = group_key
+    batch_data_sorted = batch_data.sort_values(by="remaining_words")
+    
     try:
-        # Invoke the parallel runnable
-        result = parallel_runnable.invoke(input_data)
-        results.append({
-            "input": row["input"],
-            "logical_name": result["logical_name"],
-            "description": result["description"]
-        })
+        # Generate chat messages
+        messages = generate_chat_messages(tablename, batch_data_sorted)
+        
+        # Call ChatGPT-4 with chat history
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=messages,
+            temperature=0.3
+        )
+        
+        # Extract JSON from response
+        json_str = re.search(r'\{.*\}', response.choices[0].message.content, re.DOTALL).group()
+        results = json.loads(json_str)
+        
+        # Map results
+        logical_names = []
+        logical_descs = []
+        for _, row in batch_data.iterrows():
+            col_name = row["columnname"]
+            entry = results.get(col_name, {})
+            logical_names.append(entry.get("logical_name", "ERROR"))
+            logical_descs.append(entry.get("logical_description", "ERROR"))
+            
+        return logical_names, logical_descs
+    
     except Exception as e:
-        print(f"Error processing row {index}: {e}")
-        # Retry with a refreshed token
-        print("Retrying with a refreshed token...")
-        logical_name_chain.llm = initialize_llm()  # Reinitialize LLM
-        description_chain.llm = initialize_llm()  # Reinitialize LLM
-        result = parallel_runnable.invoke(input_data)
-        results.append({
-            "input": row["input"],
-            "logical_name": result["logical_name"],
-            "description": result["description"]
-        })
+        print(f"Error in batch {group_key}: {str(e)}")
+        return ["ERROR"] * len(batch_data), ["ERROR"] * len(batch_data)
 
-# Step 9: Save Results to Output CSV File
-output_df = pd.DataFrame(results)
-output_df.to_csv(output_csv_path, index=False)
+# Main workflow (same as previous)
+def main():
+    df = pd.read_csv("your_data.csv")
+    df = preprocess_data(df)
+    grouped = df.groupby(["tablename", "first_word"])
+    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        futures = {}
+        results_df = df.copy()
+        results_df[["columnlogicalname", "columnlogicaldescription"]] = ""
+        
+        for group_key, batch_data in grouped:
+            future = executor.submit(process_batch, group_key, batch_data)
+            futures[future] = group_key
+        
+        for future in concurrent.futures.as_completed(futures):
+            group_key = futures[future]
+            try:
+                names, descs = future.result()
+                mask = (results_df["tablename"] == group_key[0]) & (results_df["first_word"] == group_key[1])
+                results_df.loc[mask, "columnlogicalname"] = names
+                results_df.loc[mask, "columnlogicaldescription"] = descs
+            except Exception as e:
+                print(f"Batch {group_key} failed: {str(e)}")
+    
+    results_df.drop(columns=["column_parts", "first_word", "remaining_words"], inplace=True)
+    results_df.to_csv("results.csv", index=False)
 
-print(f"Results saved to {output_csv_path}")
+if __name__ == "__main__":
+    main()
