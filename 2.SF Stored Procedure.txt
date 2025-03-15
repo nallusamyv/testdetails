@@ -1,65 +1,118 @@
-CREATE OR REPLACE PROCEDURE GENERATE_FUNCTIONS()
-    RETURNS STRING
-    LANGUAGE JAVASCRIPT
-    EXECUTE AS CALLER
-AS
-$$
-try {
-    // Define variables
-    var sql_commands = [];
 
-    // Iterate over COLUMN_TO_LOB_PG_MAP
-    var column_to_lob_pg_map_query = "SELECT * FROM DEV_11111_METADATA_DB.META_T.COLUMN_TO_LOB_PG_MAP";
-    var column_to_lob_pg_map_result = snowflake.execute({sqlText: column_to_lob_pg_map_query});
+import pandas as pd
+from langchain.schema import SystemMessage, HumanMessage
+from langchain.chains import LLMChain
+from langchain.prompts import ChatPromptTemplate
+from langchain.llms import OpenAI
+from langchain.schema.runnable import RunnableParallel
+from langchain.memory import ConversationBufferMemory
+import time
 
-    while (column_to_lob_pg_map_result.next()) {
-        var table_name = column_to_lob_pg_map_result.getColumnValue("TABLENAME");
-        var field_name = column_to_lob_pg_map_result.getColumnValue("FIELD");
-        var data_type = column_to_lob_pg_map_result.getColumnValue("DATATYPE");
-        var protection_group = column_to_lob_pg_map_result.getColumnValue("PROTECTIONGROUP");
+# Step 1: Token Management
+class TokenManager:
+    def __init__(self, token_initializer):
+        self.token_initializer = token_initializer
+        self.access_token = self.token_initializer()
+        self.last_refresh_time = time.time()
 
-        // Query NATIVE_ROLE_AD_MAPPING to get RBAC_ROLE
-        var rbac_role_query = "SELECT DISTINCT RBAC_ROLE, FUNCTIONNAME, DBNAME, SCHEMANAME FROM DEV_11111_METADATA_DB.META_T.NATIVE_ROLE_AD_MAPPING " +
-                              "WHERE TABLENAME = '" + table_name + "' " +
-                              "AND PROTECTIONGROUP = '" + protection_group + "' " +
-                              "AND DATATYPE = '" + data_type + "'";
-        var rbac_role_result = snowflake.execute({sqlText: rbac_role_query});
+    def get_token(self):
+        # Refresh token if it has expired (e.g., after 1 hour)
+        if time.time() - self.last_refresh_time > 3600:  # 1 hour expiration
+            self.access_token = self.token_initializer()
+            self.last_refresh_time = time.time()
+        return self.access_token
 
-        while (rbac_role_result.next()) {
-            var rbac_role = rbac_role_result.getColumnValue("RBAC_ROLE");
-            var database_name = rbac_role_result.getColumnValue("DBNAME");
-            var schema_name = rbac_role_result.getColumnValue("SCHEMANAME");
-             
-        // Generate function name and create function
-            var function_name = rbac_role_result.getColumnValue("FUNCTIONNAME");
-            var create_function_sql = `
-                CREATE OR REPLACE FUNCTION ${function_name}() RETURNS BOOLEAN MEMOIZABLE AS /$/$
-                SELECT EXISTS(
-                    SELECT 1
-                    FROM DEV_11111_METADATA_DB.META_T.AD_MAPPING
-                    WHERE UserId = CURRENT_USER()
-                    AND RBAC_Role = '${rbac_role}'
-                ) /$/$`;
+# Example token initializer function (replace with your actual logic)
+def initialize_token():
+    print("Refreshing access token...")
+    return "your_new_access_token"
 
-                 // Replace /$/ with empty string in the SQL command
-            create_temp_sql = create_function_sql.replace(/\/\$/g, "$");
-            create_function_sql = create_temp_sql.replace(/\/\$/g, "$");
+# Initialize token manager
+token_manager = TokenManager(initialize_token)
 
-            // Accumulate the SQL command
-            sql_commands.push(create_function_sql);     
-                
-        }
-    }
-    sql_commands.forEach(function(sql_command) {
-        snowflake.execute({sqlText: sql_command});
-    }); 
-    return 'Successful execution';
-} catch (err) {
-    return "Error: " + err;
-}
-$$;
+# Step 2: Initialize LLM with Token Refresh
+def initialize_llm():
+    return OpenAI(
+        openai_api_key=token_manager.get_token(),  # Use the refreshed token
+        temperature=0.7
+    )
 
+# Step 3: Define Memory for Previous Results
+memory = ConversationBufferMemory(memory_key="chat_history")
 
+# Step 4: Define Prompt Templates with Memory
+# Template for generating a logical name
+logical_name_template = ChatPromptTemplate.from_messages([
+    ("system", "You are a helpful assistant."),
+    ("human", "Generate a logical name for: {input}"),
+])
 
+# Template for generating a description
+description_template = ChatPromptTemplate.from_messages([
+    ("system", "You are a helpful assistant."),
+    ("human", "Generate a description for: {input}"),
+])
 
+# Step 5: Define LLM Chains with Memory
+# Chain for generating a logical name
+logical_name_chain = LLMChain(
+    llm=initialize_llm(),  # Initialize LLM with token refresh
+    prompt=logical_name_template,
+    output_key="logical_name",
+    memory=memory  # Add memory to the chain
+)
 
+# Chain for generating a description
+description_chain = LLMChain(
+    llm=initialize_llm(),  # Initialize LLM with token refresh
+    prompt=description_template,
+    output_key="description",
+    memory=memory  # Add memory to the chain
+)
+
+# Step 6: Use RunnableParallel to Run Chains in Parallel
+# Define the parallel runnable
+parallel_runnable = RunnableParallel(
+    logical_name=logical_name_chain,
+    description=description_chain
+)
+
+# Step 7: Load the Input CSV File
+input_csv_path = "input.csv"  # Replace with your input CSV file path
+output_csv_path = "output.csv"  # Replace with your desired output CSV file path
+
+# Load the CSV file into a DataFrame
+df = pd.read_csv(input_csv_path)
+
+# Step 8: Process Each Row and Generate Results
+results = []
+
+for index, row in df.iterrows():
+    input_data = {"input": row["input"]}  # Replace "input" with the column name in your CSV
+
+    try:
+        # Invoke the parallel runnable
+        result = parallel_runnable.invoke(input_data)
+        results.append({
+            "input": row["input"],
+            "logical_name": result["logical_name"],
+            "description": result["description"]
+        })
+    except Exception as e:
+        print(f"Error processing row {index}: {e}")
+        # Retry with a refreshed token
+        print("Retrying with a refreshed token...")
+        logical_name_chain.llm = initialize_llm()  # Reinitialize LLM
+        description_chain.llm = initialize_llm()  # Reinitialize LLM
+        result = parallel_runnable.invoke(input_data)
+        results.append({
+            "input": row["input"],
+            "logical_name": result["logical_name"],
+            "description": result["description"]
+        })
+
+# Step 9: Save Results to Output CSV File
+output_df = pd.DataFrame(results)
+output_df.to_csv(output_csv_path, index=False)
+
+print(f"Results saved to {output_csv_path}")
