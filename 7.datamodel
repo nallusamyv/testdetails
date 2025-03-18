@@ -1,48 +1,54 @@
 import pandas as pd
 
-def batch_grouped_data(df, batch_size):
-    # Extract the first word from 'field_name' using split on underscore
-    df['first_word'] = df['field_name'].str.split('_').str[0]
+def split_into_batches(df, batch_size):
+    # Extract first word of field_name
+    df['field_group'] = df['field_name'].str.split().str[0]
     
-    # Group by 'table_name' and 'first_word' and collect the groups
-    grouped = df.groupby(['table_name', 'first_word'])
-    groups = [group for _, group in grouped]
+    # Create a unique group key
+    df['group_key'] = df['table_name'] + '_' + df['field_group']
     
-    # Sort groups by size in descending order to optimize packing
-    groups.sort(key=lambda g: len(g), reverse=True)
+    # Sort to maintain order (optional)
+    df = df.sort_values(['table_name', 'field_group'])
     
+    # Group records based on `group_key`
+    grouped = df.groupby('group_key')
+    
+    # Create batches
     batches = []
     current_batch = []
-    current_count = 0
-    
-    for group in groups:
+    current_size = 0
+
+    for _, group in grouped:
         group_size = len(group)
         
-        # If the group is larger than the batch_size, add it as a separate batch
-        if group_size > batch_size:
-            batches.append(group)
-            continue
-        
-        # Check if adding this group would exceed the current batch size
-        if current_count + group_size > batch_size:
-            if current_batch:
-                # Combine the current_batch groups into a single DataFrame
-                batches.append(pd.concat(current_batch, ignore_index=True))
-                current_batch = []
-                current_count = 0
-        
-        # Add the group to the current batch
+        # If adding the current group exceeds batch size, start a new batch
+        if current_size + group_size > batch_size and current_batch:
+            batches.append(pd.concat(current_batch))
+            current_batch = []
+            current_size = 0
+
+        # Add group to the current batch
         current_batch.append(group)
-        current_count += group_size
-    
-    # Add any remaining groups in the current_batch
+        current_size += group_size
+
+    # Add any remaining batch
     if current_batch:
-        batches.append(pd.concat(current_batch, ignore_index=True))
+        batches.append(pd.concat(current_batch))
     
     return batches
 
-# Example usage:
-# Assuming df is your DataFrame with 'table_name' and 'field_name' columns
-# batches = batch_grouped_data(df, batch_size=1000)
-# for batch in batches:
-#     process(batch)  # Replace with your processing function
+# Sample Data
+data = {
+    'table_name': ['A', 'A', 'A', 'A', 'B', 'B', 'B', 'B'],
+    'field_name': ['name first', 'name last', 'address street', 'address zip', 'city name', 'city code', 'state full', 'state short']
+}
+
+df = pd.DataFrame(data)
+
+# Split into batches
+batch_size = 3  # Set batch size
+batches = split_into_batches(df, batch_size)
+
+# Print results
+for i, batch in enumerate(batches):
+    print(f"Batch {i+1}:\n", batch, "\n")
