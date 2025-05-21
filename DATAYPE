@@ -1,0 +1,18 @@
+| Teradata Type             | Delta Lake (on S3)         | Iceberg (on S3)            | Snowflake                | Notes                                                                |
+| ------------------------- | -------------------------- | -------------------------- | ------------------------ | -------------------------------------------------------------------- |
+| **BYTEINT**               | `ByteType` (8-bit int)     | `Byte`                     | `NUMBER(3,0)`            | Snowflake emulates with small `NUMBER`                               |
+| **SMALLINT**              | `ShortType`                | `Short`                    | `NUMBER(5,0)`            | Supported everywhere                                                 |
+| **INTEGER / INT**         | `IntegerType`              | `Int`                      | `NUMBER(10,0)`           | Commonly supported                                                   |
+| **BIGINT**                | `LongType`                 | `Long`                     | `NUMBER(19,0)`           | Fully supported                                                      |
+| **DECIMAL(p,s)**          | `Decimal(p,s)` (max p=38)  | `Decimal(p,s)` (max p=38)  | `NUMBER(p,s)` (max p=38) | All support precision up to 38                                       |
+| **FLOAT / REAL**          | `FloatType` (32-bit)       | `Float`                    | `FLOAT`                  | Might lose precision when converting                                 |
+| **DOUBLE PRECISION**      | `DoubleType` (64-bit)      | `Double`                   | `FLOAT`                  | Snowflake uses `FLOAT` (64-bit)                                      |
+| **CHAR(n)**               | `StringType`               | `String`                   | `CHAR(n)`                | Delta/Iceberg treat all as variable-length unless explicitly encoded |
+| **VARCHAR(n)**            | `StringType`               | `String`                   | `VARCHAR(n)`             | Length not enforced in Parquet (Delta/Iceberg)                       |
+| **CLOB**                  | `StringType`               | `String`                   | `TEXT`                   | Delta/Iceberg treat as `String` — careful with large values          |
+| **DATE**                  | `DateType`                 | `Date`                     | `DATE`                   | Fully supported                                                      |
+| **TIME**                  | `TimestampType` (w/ trunc) | `Time` (Trino dependent)   | `TIME`                   | Delta truncates to seconds; Iceberg support depends on query engine  |
+| **TIMESTAMP(n)**          | `TimestampType` (μs max)   | `Timestamp` (μs precision) | `TIMESTAMP_NTZ/LTZ/TZ`   | Snowflake supports nanoseconds; Delta/Iceberg up to microseconds     |
+| **INTERVAL**              | Not supported (use string) | Not supported              | `INTERVAL`               | Convert to `STRING` in Delta/Iceberg                                 |
+| **BLOB / BYTE / VARBYTE** | `BinaryType`               | `Binary`                   | `BINARY`                 | Iceberg/Delta may have size limits; avoid very large blobs           |
+| **BOOLEAN**               | `BooleanType`              | `Boolean`                  | `BOOLEAN`                | Fully supported                                                      |
