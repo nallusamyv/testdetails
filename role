@@ -1,0 +1,10 @@
+| Role           | Format Used | Tool       | Access Level        | Format Mechanism                          |
+| -------------- | ----------- | ---------- | ------------------- | ----------------------------------------- |
+| Data Scientist | Delta       | Databricks | Full + Masking (UC) | Unity Catalog + Notebooks                 |
+| Data Analyst   | Iceberg     | Snowflake  | Masked View         | Delta UniForm + External Iceberg Metadata |
+
+
+
+Format Accessed	Tool	Masking Applies?	Who Controls It
+Delta	Databricks	✅ Yes (Unity Catalog)	Unity Catalog (Databricks)
+Iceberg	Snowflake	✅ Yes (if you define it)	Snowflake masking policies
