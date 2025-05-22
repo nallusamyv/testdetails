@@ -1,18 +1,53 @@
-| Teradata Type             | Delta Lake (on S3)         | Iceberg (on S3)            | Snowflake                | Notes                                                                |
-| ------------------------- | -------------------------- | -------------------------- | ------------------------ | -------------------------------------------------------------------- |
-| **BYTEINT**               | `ByteType` (8-bit int)     | `Byte`                     | `NUMBER(3,0)`            | Snowflake emulates with small `NUMBER`                               |
-| **SMALLINT**              | `ShortType`                | `Short`                    | `NUMBER(5,0)`            | Supported everywhere                                                 |
-| **INTEGER / INT**         | `IntegerType`              | `Int`                      | `NUMBER(10,0)`           | Commonly supported                                                   |
-| **BIGINT**                | `LongType`                 | `Long`                     | `NUMBER(19,0)`           | Fully supported                                                      |
-| **DECIMAL(p,s)**          | `Decimal(p,s)` (max p=38)  | `Decimal(p,s)` (max p=38)  | `NUMBER(p,s)` (max p=38) | All support precision up to 38                                       |
-| **FLOAT / REAL**          | `FloatType` (32-bit)       | `Float`                    | `FLOAT`                  | Might lose precision when converting                                 |
-| **DOUBLE PRECISION**      | `DoubleType` (64-bit)      | `Double`                   | `FLOAT`                  | Snowflake uses `FLOAT` (64-bit)                                      |
-| **CHAR(n)**               | `StringType`               | `String`                   | `CHAR(n)`                | Delta/Iceberg treat all as variable-length unless explicitly encoded |
-| **VARCHAR(n)**            | `StringType`               | `String`                   | `VARCHAR(n)`             | Length not enforced in Parquet (Delta/Iceberg)                       |
-| **CLOB**                  | `StringType`               | `String`                   | `TEXT`                   | Delta/Iceberg treat as `String` — careful with large values          |
-| **DATE**                  | `DateType`                 | `Date`                     | `DATE`                   | Fully supported                                                      |
-| **TIME**                  | `TimestampType` (w/ trunc) | `Time` (Trino dependent)   | `TIME`                   | Delta truncates to seconds; Iceberg support depends on query engine  |
-| **TIMESTAMP(n)**          | `TimestampType` (μs max)   | `Timestamp` (μs precision) | `TIMESTAMP_NTZ/LTZ/TZ`   | Snowflake supports nanoseconds; Delta/Iceberg up to microseconds     |
-| **INTERVAL**              | Not supported (use string) | Not supported              | `INTERVAL`               | Convert to `STRING` in Delta/Iceberg                                 |
-| **BLOB / BYTE / VARBYTE** | `BinaryType`               | `Binary`                   | `BINARY`                 | Iceberg/Delta may have size limits; avoid very large blobs           |
-| **BOOLEAN**               | `BooleanType`              | `Boolean`                  | `BOOLEAN`                | Fully supported                                                      |
+Overview of Atlan AI
+Atlan AI is an AI-augmented metadata assistant integrated into the Atlan data catalog. It’s designed to streamline metadata enrichment by helping users:
+
+Connect to various data sources (e.g., Snowflake, Databricks).
+
+Automatically ingest tables, columns, and data types.
+
+Suggest column descriptions using general LLM-based inference.
+
+Perform basic classification of sensitive data (PII, financial, etc.) using rule-based or ML models.
+
+Enable collaboration by allowing users to review, validate, and improve metadata (e.g., via Slack or Google Sheets).
+
+It supports business glossary integration, allowing users to define terms and map them to data assets, either manually or through rule-based/AI-assisted mappings.
+
+⚠️ Where Atlan AI Falls Short Compared to Your Application
+Despite its user-friendly features and broad data integration support, Atlan AI does not match the precision, contextual understanding, or company-specific intelligence that your custom application provides.
+
+1. Lacks Context-Aware Enrichment
+Atlan uses generic LLMs without awareness of your organization's internal standards.
+
+Your app, in contrast, uses ChromaDB to retain and reuse contextual knowledge, enabling highly accurate and consistent outputs.
+
+2. No Support for Logical Name Generation
+Atlan cannot generate column_logical_name based on deep semantic transformation.
+
+Your app uses LLM logic + historical context to reliably create logical, standards-aligned names.
+
+3. Classification Is Not Standards-Driven
+Atlan uses static rules or ML heuristics to classify metadata (e.g., PCI, PII).
+
+Your app classifies fields using your company-specific classification system, consistently enforced via LLM prompts and historical patterns.
+
+4. No Dynamic Adaptation
+Atlan’s AI suggestions don’t evolve based on past enrichments.
+
+Your app dynamically learns from new inputs and adapts, enabling a smarter, self-improving pipeline.
+
+5. No Vector Reasoning or Memory
+Atlan lacks any vector database integration, meaning it cannot perform semantic matching or reuse past enrichment context.
+
+Your app leverages ChromaDB to reason over similar past records, improving quality and consistency.
+
+6. Cannot Auto-Generate Protection Groups or Indicators
+Atlan does not support calculated metadata like protection_group, pci_indicator, or client_confidential_indicator out-of-the-box.
+
+Your app applies this logic automatically using prompt-aware enrichment.
+
+7. Limited Feedback Loop
+Atlan offers human-in-the-loop review but doesn’t retain learning from these reviews.
+
+Your system continuously improves as more vendor inputs and standards evolve, thanks to vector embedding memory.
+
