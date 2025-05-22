@@ -1,3 +1,29 @@
+Your AI-based enrichment application does the following:
+
+Takes standardized vendor input (column name, description).
+
+Uses company-defined business glossary, data standards.
+
+Applies LLM + ChromaDB context to:
+
+Generate column_logical_name
+
+Generate column_logical_description
+
+Identify datatype
+
+Apply protection_group
+
+Classify using confidential_classification, pci_indicator, client_confidential_indicator
+
+Populate other context-aware metadata fields.
+
+Adapts dynamically to new inputs + new standards.
+
+Stores past enriched knowledge in ChromaDB for vector-based reuse.
+
+
+
 Overview of Atlan AI
 Atlan AI is an AI-augmented metadata assistant integrated into the Atlan data catalog. It’s designed to streamline metadata enrichment by helping users:
 
