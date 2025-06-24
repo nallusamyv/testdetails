@@ -1,0 +1,21 @@
+import tiktoken
+
+# Choose your model (gpt-3.5-turbo, gpt-4, etc.)
+model_name = "gpt-4"
+encoding = tiktoken.encoding_for_model(model_name)
+
+# Example input and output
+input_prompt = "Translate the following sentence to French:\nHello, how are you?"
+output_response = "Bonjour, comment ça va ?"
+
+# Encode and count tokens
+input_tokens = len(encoding.encode(input_prompt))
+output_tokens = len(encoding.encode(output_response))
+
+# Display result
+print(f"Model: {model_name}")
+print(f"Input Prompt: {input_prompt}")
+print(f"Input Tokens: {input_tokens}")
+print(f"Output Response: {output_response}")
+print(f"Output Tokens: {output_tokens}")
+print(f"Total Tokens: {input_tokens + output_tokens}")
