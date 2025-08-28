@@ -1,104 +1,16 @@
-import pandas as pd
-import concurrent.futures
-import json
-import re
-from openai import OpenAI  # Use actual OpenAI client
+GRANT USAGE ON DATABASE DB_SOURCE TO ROLE VIEW_CREATOR_ROLE;
+GRANT USAGE ON SCHEMA DB_SOURCE.SOURCE_SCHEMA TO ROLE VIEW_CREATOR_ROLE;
+GRANT SELECT ON TABLE DB_SOURCE.SOURCE_SCHEMA.SOURCE_TABLE TO ROLE VIEW_CREATOR_ROLE;
 
-client = OpenAI(api_key="your_api_key")
+-- Create view in DB_TARGET
+USE DATABASE DB_TARGET;
+USE SCHEMA TARGET_SCHEMA;
 
-# Preprocess and group data
-def preprocess_data(df):
-    df["column_parts"] = df["columnname"].apply(lambda x: x.split("_"))
-    df["first_word"] = df["column_parts"].apply(lambda x: x[0])
-    df["remaining_words"] = df["column_parts"].apply(lambda x: "_".join(x[1:]) if len(x) > 1 else "")
-    return df
+CREATE VIEW VW_SOURCE_TABLE AS
+  SELECT *
+  FROM DB_SOURCE.SOURCE_SCHEMA.SOURCE_TABLE;
 
-# Generate chat messages for a batch
-def generate_chat_messages(tablename, batch_data):
-    system_msg = {
-        "role": "system",
-        "content": f'''
-        You are a data modeling assistant. Generate UNIQUE logical names and descriptions for database columns.
-        Rules:
-        1. Logical names must be unique within this batch (e.g., "24 Month Balance" vs "12 Month Balance").
-        2. Include distinguishing terms like numbers or time periods.
-        3. Descriptions should explain business context.
-        '''
-    }
-
-    user_content = f"Table: {tablename}\nColumns:\n"
-    for _, row in batch_data.iterrows():
-        user_content += f"- {row['columnname']}: {row['columndescription']}\n"
-
-    user_msg = {
-        "role": "user",
-        "content": user_content + "\nOutput JSON:"
-    }
-
-    return [system_msg, user_msg]
-
-# Process a batch with chat memory
-def process_batch(group_key, batch_data):
-    tablename, first_word = group_key
-    batch_data_sorted = batch_data.sort_values(by="remaining_words")
-    
-    try:
-        # Generate chat messages
-        messages = generate_chat_messages(tablename, batch_data_sorted)
-        
-        # Call ChatGPT-4 with chat history
-        response = client.chat.completions.create(
-            model="gpt-4",
-            messages=messages,
-            temperature=0.3
-        )
-        
-        # Extract JSON from response
-        json_str = re.search(r'\{.*\}', response.choices[0].message.content, re.DOTALL).group()
-        results = json.loads(json_str)
-        
-        # Map results
-        logical_names = []
-        logical_descs = []
-        for _, row in batch_data.iterrows():
-            col_name = row["columnname"]
-            entry = results.get(col_name, {})
-            logical_names.append(entry.get("logical_name", "ERROR"))
-            logical_descs.append(entry.get("logical_description", "ERROR"))
-            
-        return logical_names, logical_descs
-    
-    except Exception as e:
-        print(f"Error in batch {group_key}: {str(e)}")
-        return ["ERROR"] * len(batch_data), ["ERROR"] * len(batch_data)
-
-# Main workflow (same as previous)
-def main():
-    df = pd.read_csv("your_data.csv")
-    df = preprocess_data(df)
-    grouped = df.groupby(["tablename", "first_word"])
-    
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-        futures = {}
-        results_df = df.copy()
-        results_df[["columnlogicalname", "columnlogicaldescription"]] = ""
-        
-        for group_key, batch_data in grouped:
-            future = executor.submit(process_batch, group_key, batch_data)
-            futures[future] = group_key
-        
-        for future in concurrent.futures.as_completed(futures):
-            group_key = futures[future]
-            try:
-                names, descs = future.result()
-                mask = (results_df["tablename"] == group_key[0]) & (results_df["first_word"] == group_key[1])
-                results_df.loc[mask, "columnlogicalname"] = names
-                results_df.loc[mask, "columnlogicaldescription"] = descs
-            except Exception as e:
-                print(f"Batch {group_key} failed: {str(e)}")
-    
-    results_df.drop(columns=["column_parts", "first_word", "remaining_words"], inplace=True)
-    results_df.to_csv("results.csv", index=False)
-
-if __name__ == "__main__":
-    main()
+-- Grant access to END_USER_ROLE
+GRANT USAGE ON DATABASE DB_TARGET TO ROLE END_USER_ROLE;
+GRANT USAGE ON SCHEMA DB_TARGET.TARGET_SCHEMA TO ROLE END_USER_ROLE;
+GRANT SELECT ON VIEW DB_TARGET.TARGET_SCHEMA.VW_SOURCE_TABLE TO ROLE END_USER_ROLE;
