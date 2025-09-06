@@ -1,119 +1,37 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import date_format
+from pyspark.sql.types import StructType, StructField, DecimalType, IntegerType, FloatType, StringType, DateType
 
+# Create a SparkSession
 spark = SparkSession.builder \
-    .appName("example") \
+    .appName("Writing Parquet File") \
     .getOrCreate()
 
-# Assuming you have an existing DataFrame named duplicated_df
-# (generated using the previous code)
-duplicated_df = spark.createDataFrame([(i,) for i in range(1, 101)], ["id"])
-duplicated_df = duplicated_df.withColumn("random_date", expr("date_add(current_date(), floor(rand() * 100).cast('int'))"))
-duplicated_df = duplicated_df.withColumn("group_id", floor((col("id") - 1) / 10))
-duplicated_df = duplicated_df.withColumn("random_date", expr("first(random_date, true) over (partition by group_id)")).drop("group_id")
+# Define schema for the DataFrame with one field for each data type
+schema = StructType([
+    StructField("credit_card_number", StringType()),
+    StructField("card_type", StringType()),
+    StructField("expiry_date", StringType()),
+    StructField("cardholder_name", StringType()),
+    StructField("cvv", StringType()),
+    StructField("transaction_amount", DecimalType(10, 2)),
+    StructField("transaction_date", DateType()),
+    StructField("latitude", FloatType()),
+    StructField("longitude", FloatType()),
+    StructField("partition_dt", StringType()),
+    StructField("contxt_id", StringType())
+])
 
-# Collect distinct partition dates and format them
-partition_dates = duplicated_df.select(date_format("random_date", "yyyyMMdd").alias("partition_date")).distinct().collect()
+# Sample data
+data = [
+    ("**** **** **** 1234", "Visa", "05/26", "John Doe", "123", 100.50, "2024-05-16", 40.7128, -74.0060, "2024-05-16", "context1"),
+    ("**** **** **** 5678", "Mastercard", "07/25", "Jane Smith", "456", 200.75, "2024-05-16", 34.0522, -118.2437, "2024-05-16", "context2")
+]
 
-# Print the partition dates
-for row in partition_dates:
-    print(row["partition_date"])from pyspark.sql import SparkSession
+# Create a DataFrame
+df = spark.createDataFrame(data, schema)
 
-spark = SparkSession.builder \
-    .appName("example") \
-    .getOrCreate()
+# Write DataFrame to Parquet file partitioned by partition_dt and contxt_id
+df.write.partitionBy("partition_dt", "contxt_id").parquet("credit_card_data.parquet")
 
-# Assuming you have an existing DataFrame named duplicated_df
-# (generated using the previous code)
-duplicated_df = spark.createDataFrame([(i,) for i in range(1, 101)], ["id"])
-duplicated_df = duplicated_df.withColumn("random_date", expr("date_add(current_date(), floor(rand() * 100).cast('int'))"))
-duplicated_df = duplicated_df.withColumn("group_id", floor((col("id") - 1) / 10))
-duplicated_df = duplicated_df.withColumn("random_date", expr("first(random_date, true) over (partition by group_id)")).drop("group_id")
-
-# Collect distinct partition dates
-partition_dates = duplicated_df.select("random_date").distinct().collect()
-
-# Print the partition dates
-for row in partition_dates:
-    print(row["random_date"])from pyspark.sql import SparkSession
-from pyspark.sql.functions import lit, expr, floor, col
-
-spark = SparkSession.builder \
-    .appName("example") \
-    .getOrCreate()
-
-# Assuming you have an existing DataFrame named df
-existing_df = spark.createDataFrame([(i,) for i in range(1, 101)], ["id"])
-
-# Generate random date for each group of 10 records
-existing_df = existing_df.withColumn("random_date", expr("date_add(current_date(), floor(rand() * 100).cast('int'))"))
-
-# Duplicate the random date for each group of 10 records
-duplicated_df = existing_df.withColumn("group_id", floor((col("id") - 1) / 10)) \
-    .withColumn("random_date", expr("first(random_date, true) over (partition by group_id)")) \
-    .drop("group_id")
-
-# Show the DataFrame with 10 records having the same random date for each group
-duplicated_df.show()from pyspark.sql import SparkSession
-from pyspark.sql.functions import lit, expr, floor, col
-
-spark = SparkSession.builder \
-    .appName("example") \
-    .getOrCreate()
-
-# Assuming you have an existing DataFrame named df
-existing_df = spark.createDataFrame([(i,) for i in range(1, 101)], ["id"])
-
-# Generate random date for each group of 10 records
-existing_df = existing_df.withColumn("random_date", expr("date_add(current_date(), floor(cast(rand() * 100 as int)))"))
-
-# Duplicate the random date for each group of 10 records
-duplicated_df = existing_df.withColumn("group_id", floor((col("id") - 1) / 10)) \
-    .withColumn("random_date", expr("first(random_date, true) over (partition by group_id)")) \
-    .drop("group_id")
-
-# Show the DataFrame with 10 records having the same random date for each group
-duplicated_df.show()
- pyspark.sql import SparkSession
-from pyspark.sql.functions import lit, expr, floor, col
-
-spark = SparkSession.builder \
-    .appName("example") \
-    .getOrCreate()
-
-# Assuming you have an existing DataFrame named df
-existing_df = spark.createDataFrame([(i,) for i in range(1, 101)], ["id"])
-
-# Generate random date for each group of 10 records
-existing_df = existing_df.withColumn("random_date", expr("date_add(current_date(), floor(rand() * 100))"))
-
-# Duplicate the random date for each group of 10 records
-duplicated_df = existing_df.withColumn("group_id", (col("id") - 1) / 10) \
-    .withColumn("random_date", expr("first(random_date, true) over (partition by group_id)")) \
-    .drop("group_id")
-
-# Show the DataFrame with 10 records having the same random date for each group
-duplicated_df.show()Open sidebar
-ChatGPT 3.5
-
-User
-Fine grained Access control implemented in tps analytics platform successfully and the access control is working as expected in ABC analytics platform.  One observation we noticed that fields PG group specified incorrectly and associated with corresponding AD protected group. Further meeting set up with PO and explain the differences and work with them to resolve this. Please reword
-
-Save & Submit
-
-Cancel
-ChatGPT
-Fine-tuned access control has been effectively integrated into the TPS analytics platform, operating seamlessly within the ABC analytics platform. An observation revealed a misalignment in the fields designated by the PG group, erroneously linked to their respective AD protected groups. We will schedule a meeting with the product owner to elucidate these variances and collaborate on rectifying them.
-
-User
-Fine grained Access control implemented in tps analytics platform successfully and the access control is working as expected in ABCD analytics platform. It was implemented using immuta which uses snowflake native access. The performance is not impacted due to One observation we noticed that fields PG group specified incorrectly and associated with cosponding AD protected group. Further meeting set up with PO and explain the differences and work with them to resolve this. Please reword. 
-ChatGPT
-The implementation of fine-grained access control in the TPS analytics platform has been successful, with seamless functionality observed in the ABCD analytics platform. This was achieved through Immuta, leveraging Snowflake's native access capabilities, ensuring performance remains unaffected. However, an observation indicates that the fields specified by the PG group are inaccurately associated with their corresponding AD protected groups. To address this, a meeting will be arranged with the product owner to discuss these discrepancies and collaborate on resolving them.
-
-
-
-
-Message ChatGPT…
-
-ChatGPT can make mistakes. Consider checking important information.
-ChatGPT
+# Stop the SparkSession
+spark.stop()
