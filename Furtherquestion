@@ -1,0 +1,129 @@
+Python + LLM (Large Language Models)
+
+Q1: How do you load an LLM model in Python using a library like OpenAI or LangChain?
+
+Explanation: You initialize the model object with parameters like model name, temperature, or API key. This object acts as an interface to generate text or embeddings.
+
+Q2: What is a prompt template in LangChain?
+
+Explanation: A reusable template for formatting input prompts to an LLM. It can include variables for dynamic content. Helps maintain consistency and reduces errors in prompt construction.
+
+Q3: Difference between synchronous and streaming responses from an LLM
+
+Explanation:
+
+Synchronous: Model returns the full output after processing.
+
+Streaming: Model returns output incrementally, useful for long responses or real-time interfaces.
+
+LangChain Concepts
+
+Q4: What is a Chain in LangChain?
+
+Explanation: A sequence of steps that combines multiple operations—like prompt creation, LLM call, and output parsing—into a single pipeline.
+
+Q5: What is an Agent in LangChain?
+
+Explanation: An intelligent system that can decide which tool, API, or chain to use based on user input. It allows dynamic multi-step reasoning rather than a static chain.
+
+Q6: What is the role of a Memory in LangChain?
+
+Explanation: Stores conversation state or intermediate results across multiple calls, allowing context retention in multi-turn interactions with an LLM.
+
+LangGraph Concepts
+
+Q7: What is LangGraph?
+
+Explanation: Visualizes and manages LangChain pipelines as a directed graph, showing how inputs, LLM calls, and outputs are connected. Helps debug and optimize workflows.
+
+Q8: How does LangGraph help in testing a pipeline?
+
+Explanation: You can trace each node (step) to see what data is flowing, identify errors, or check whether the LLM or database retrieval worked.
+
+Q9: Difference between node types in LangGraph
+
+Explanation:
+
+Input nodes: Receive user input or data.
+
+LLM nodes: Call the model to generate output.
+
+Tool nodes: Interact with external APIs or databases.
+
+Output nodes: Collect final results for return.
+
+Vector Databases / ChromaDB
+
+Q10: What is a vector database and why is it used with embeddings?
+
+Explanation: Stores high-dimensional vectors efficiently, enabling similarity searches. Ideal for semantic search, recommendation, or retrieval-augmented generation.
+
+Q11: How do you test if your vector database is working?
+
+Explanation:
+
+Insert a few sample embeddings.
+
+Perform a similarity query using a test embedding.
+
+Check if the nearest vectors returned match expectations.
+
+Q12: What does persist() do in ChromaDB?
+
+Explanation: Saves the in-memory vectors to disk so that data persists across sessions. Without persist(), data will be lost when the process ends.
+
+Q13: What is the role of collection in ChromaDB?
+
+Explanation: A logical container for vectors, similar to a table in SQL. Each collection can store multiple embeddings along with metadata.
+
+Q14: How do you handle memory limits when querying large vector databases?
+
+Explanation:
+
+Use batching or streaming queries.
+
+Limit the number of retrieved vectors per request.
+
+Offload to persistent storage instead of keeping everything in-memory.
+
+Q15: What is similarity search?
+
+Explanation: Finds vectors in the database closest to a query vector using a distance metric (like cosine similarity or Euclidean distance).
+
+Integrating LangChain + Vector DB
+
+Q16: How does LangChain connect to a vector database?
+
+Explanation: Using a retriever object. LangChain queries the vector database for relevant embeddings, then passes results to the LLM for generating a response.
+
+Q17: What is a retriever vs a memory in LangChain?
+
+Explanation:
+
+Retriever: Fetches external knowledge from a database or vector store.
+
+Memory: Stores internal conversation or workflow state.
+
+Q18: How do you debug if your LLM + vector DB pipeline is failing?
+
+Explanation:
+
+Check that embeddings are inserted correctly.
+
+Ensure the retriever is returning results.
+
+Verify the prompt template is formatting input correctly.
+
+Check LLM outputs for errors.
+
+Q19: How would you test if your embeddings are correct?
+
+Explanation:
+
+Query a known sentence and see if similar sentences are returned.
+
+Compare cosine similarity between expected pairs.
+
+Q20: What is a metadata filter in vector DB search?
+
+Explanation: Allows searching vectors based on metadata (e.g., table name, LOB) in addition to vector similarity, useful for narrowing results to specific domains.
