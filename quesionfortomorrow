@@ -1,0 +1,107 @@
+1. System Design & Architecture
+
+Objective: See if the candidate can design end-to-end systems and reason about trade-offs.
+
+Questions / Scenarios:
+
+Design a vector search system for millions of documents with LLM integration.
+
+Look for: data storage choices, embedding indexing, caching, API layer, scaling.
+
+Build a real-time AI inference pipeline with multiple concurrent users.
+
+Look for: concurrency handling, queueing, batching, Fargate/EC2 deployment.
+
+Architect a multi-service system (microservices) with reliability and observability.
+
+Look for: service decomposition, inter-service communication, monitoring/logging, fault tolerance.
+
+2. Data Engineering & Modeling
+
+Objective: Test their ability to structure, store, and process data efficiently.
+
+Questions / Scenarios:
+
+How would you store embeddings for 100M+ records and allow fast similarity search?
+
+Look for: vector DB selection, persistence, indexing, sharding/partitioning.
+
+Design a schema for analytics data with multiple LOBs and high update volume.
+
+Look for: normalization vs denormalization, partitioning, indexing, masking/security.
+
+How would you validate and maintain metadata in a large enterprise system?
+
+Look for: pipelines, versioning, auditing, error handling.
+
+3. Scaling & Performance
+
+Objective: Assess knowledge of resource management, load handling, and optimization.
+
+Questions / Scenarios:
+
+How would you handle 10k concurrent requests to an AI/vector DB service?
+
+Look for: batching, async processing, auto-scaling, caching, persistent storage.
+
+How do you optimize ECS Fargate tasks for CPU/memory-intensive workloads?
+
+Look for: right-sizing tasks, monitoring, horizontal/vertical scaling, cost/performance trade-offs.
+
+How would you design data pipelines to handle spikes without downtime?
+
+Look for: queue-based ingestion, backpressure handling, fault-tolerant design.
+
+4. Reliability & Fault Tolerance
+
+Objective: Evaluate ability to anticipate failures and design resilient systems.
+
+Questions / Scenarios:
+
+How do you design a service that must be available 24/7 with ECS + vector DB?
+
+Look for: auto-healing, retries, failover, multi-AZ deployment, persistent storage.
+
+How would you recover from corrupted data or failed embeddings in production?
+
+Look for: idempotency, versioning, auditing, retry mechanisms.
+
+How do you monitor and alert on system health for AI/DB workloads?
+
+Look for: metrics (CPU/memory/latency), logs, anomaly detection, dashboards.
+
+5. CI/CD & DevOps Integration
+
+Objective: Check if they can deploy and maintain production-grade systems.
+
+Questions / Scenarios:
+
+How do you deploy ECS tasks for LLM/vector workloads with minimal downtime?
+
+Look for: rolling/canary/blue-green deployments, image versioning, rollback strategy.
+
+How do you manage secrets for multiple services in ECS?
+
+Look for: Secrets Manager, environment injection, least privilege IAM roles.
+
+How do you test a pipeline end-to-end before production?
+
+Look for: unit/integration tests, staging environments, simulated load, monitoring alerts.
+
+6. Problem-Solving & Trade-Off Evaluation
+
+Objective: Understand their engineering mindset—do they reason about trade-offs or just implement?
+
+Questions / Scenarios:
+
+You have limited memory for a vector DB but high query volume—how do you design the system?
+
+Look for: caching, batching, persistent storage, asynchronous processing.
+
+You need low-latency AI responses for 10k concurrent users—what architecture changes?
+
+Look for: distributed compute, GPU tasks, task sharding, retriever optimizations.
+
+You need to maintain metadata audit logs for millions of rows—how do you scale it?
+
+Look for: append-only tables, incremental updates, partitioning, eventual consistency.
